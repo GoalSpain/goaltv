@@ -1,6 +1,7 @@
 ﻿package com.goaltv.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -162,13 +163,13 @@ fun SportsScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             val todayDateStr = remember { getFormattedDate(0) }
-            val tomorrowDateStr = remember { getFormattedDate(1) }
-            val pasadoDateStr = remember { getFormattedDate(2) }
+            val tomorrowFullDate = remember { getFullFormattedDate(1) }
+            val pasadoFullDate = remember { getFullFormattedDate(2) }
 
             val dateTabs = listOf(
                 "Hoy" to "HOY ($todayDateStr)",
-                "Mañana" to "MAÑANA ($tomorrowDateStr)",
-                "Pasado Mañana" to "PASADO MAÑANA ($pasadoDateStr)"
+                "Mañana" to tomorrowFullDate,
+                "Pasado Mañana" to pasadoFullDate
             )
 
             // DATE TABS: HOY, MAÑANA & PASADO MAÑANA
@@ -245,7 +246,10 @@ fun SportsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(uiState.filteredEvents, key = { it.id }) { event ->
-                        SportsEventCard(event = event)
+                        SportsEventCard(
+                            event = event,
+                            isTodayTab = uiState.selectedDateTab.equals("Hoy", ignoreCase = true)
+                        )
                     }
                 }
             }
@@ -256,51 +260,83 @@ fun SportsScreen(
 @Composable
 fun SportsEventCard(
     event: SportsEvent,
+    isTodayTab: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val isLive = remember(event.dateTimeDisplay, isTodayTab) {
+        isSportsEventCurrentlyLive(event.dateTimeDisplay, isTodayTab)
+    }
+
     FocusableCard(
         onClick = {},
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (isLive) Modifier.border(1.5.dp, OrangePrimary, RoundedCornerShape(14.dp)) else Modifier
+            ),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceDarkCard)
+        colors = CardDefaults.cardColors(
+            containerColor = if (isLive) Color(0xFF282218) else SurfaceDarkCard
+        )
     ) {
         Column(
             modifier = Modifier.padding(14.dp)
         ) {
-            // Top Row: Sport Badge + Competition Badge
+            // Top Row: Sport Badge + Competition Badge + Live Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Sport Category Badge
-                Surface(
-                    color = OrangePrimary.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(6.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.5f))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = event.sportCategory,
-                        color = OrangeGlow,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                    )
+                    // Sport Category Badge
+                    Surface(
+                        color = OrangePrimary.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(6.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, OrangePrimary.copy(alpha = 0.5f))
+                    ) {
+                        Text(
+                            text = event.sportCategory,
+                            color = OrangeGlow,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+
+                    // Competition Badge
+                    Surface(
+                        color = Color(0xFF2A1B4E),
+                        shape = RoundedCornerShape(6.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF673AB7))
+                    ) {
+                        Text(
+                            text = event.competition,
+                            color = Color(0xFFD1C4E9),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                        )
+                    }
                 }
 
-                // Competition Badge
-                Surface(
-                    color = Color(0xFF2A1B4E),
-                    shape = RoundedCornerShape(6.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF673AB7))
-                ) {
-                    Text(
-                        text = event.competition,
-                        color = Color(0xFFD1C4E9),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                    )
+                if (isLive) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(StatusSuccess)
+                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = "EN DIRECTO",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            color = DarkBackground
+                        )
+                    }
                 }
             }
 
@@ -322,7 +358,7 @@ fun SportsEventCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF1B1B28), RoundedCornerShape(8.dp))
+                    .background(if (isLive) Color(0xFF382B1C) else Color(0xFF1B1B28), RoundedCornerShape(8.dp))
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -334,12 +370,12 @@ fun SportsEventCard(
                     Icon(
                         imageVector = Icons.Rounded.Schedule,
                         contentDescription = null,
-                        tint = StatusSuccess,
+                        tint = if (isLive) OrangePrimary else StatusSuccess,
                         modifier = Modifier.size(14.dp)
                     )
                     Text(
                         text = event.dateTimeDisplay,
-                        color = StatusSuccess,
+                        color = if (isLive) OrangePrimary else StatusSuccess,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -373,4 +409,36 @@ private fun getFormattedDate(dayOffset: Int): String {
     }
     val sdf = java.text.SimpleDateFormat("d 'de' MMMM", java.util.Locale("es", "ES"))
     return sdf.format(cal.time)
+}
+
+private fun getFullFormattedDate(dayOffset: Int): String {
+    val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Europe/Madrid")).apply {
+        add(java.util.Calendar.DAY_OF_YEAR, dayOffset)
+    }
+    val dayName = java.text.SimpleDateFormat("EEEE", java.util.Locale("es", "ES")).format(cal.time)
+    val dayAndMonth = java.text.SimpleDateFormat("d 'de' MMMM", java.util.Locale("es", "ES")).format(cal.time)
+    return "${dayName.replaceFirstChar { it.uppercase() }} $dayAndMonth"
+}
+
+private fun isSportsEventCurrentlyLive(dateTimeDisplay: String, isTodayTab: Boolean): Boolean {
+    if (!isTodayTab) return false
+    return try {
+        val hourMatch = Regex("""\b(\d{1,2}:\d{2})\b""").find(dateTimeDisplay) ?: return false
+        val timeStr = hourMatch.value
+
+        val calNow = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Europe/Madrid"))
+        val currentHour = calNow.get(java.util.Calendar.HOUR_OF_DAY)
+        val currentMinute = calNow.get(java.util.Calendar.MINUTE)
+        val nowTotalMinutes = currentHour * 60 + currentMinute
+
+        val parts = timeStr.split(":")
+        val startHour = parts[0].toInt()
+        val startMin = parts[1].toInt()
+        val startTotalMinutes = startHour * 60 + startMin
+
+        val endTotalMinutes = startTotalMinutes + 115
+        nowTotalMinutes in startTotalMinutes..endTotalMinutes
+    } catch (_: Exception) {
+        false
+    }
 }
