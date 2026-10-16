@@ -413,14 +413,14 @@ fun SettingsScreen(
 
                     FocusableCard(
                         onClick = {
-                            try {
-                                importLauncher.launch(arrayOf("application/json", "*/*"))
-                            } catch (_: Exception) {
-                                val success = viewModel.repository.importLocalBackup()
-                                backupMessage = if (success) {
-                                    "Ajustes y favoritos restaurados con éxito"
-                                } else {
-                                    "No se encontró copia local para restaurar"
+                            val success = viewModel.repository.importLocalBackup()
+                            if (success) {
+                                backupMessage = "Ajustes y favoritos restaurados con éxito desde Descargas (goaltv_backup.json)"
+                            } else {
+                                try {
+                                    importLauncher.launch(arrayOf("application/json", "*/*"))
+                                } catch (_: Exception) {
+                                    backupMessage = "No se encontró el archivo goaltv_backup.json en Descargas"
                                 }
                             }
                         },
@@ -473,7 +473,17 @@ fun SettingsScreen(
                     versionCode = 5,
                     versionName = appVersionName,
                     apkUrl = "https://github.com/GoalSpain/goaltv/releases/latest/download/goaltv.apk",
-                    changelog = "• GoalTV v1.5 Versión Oficial\n• Ocultación de prefijos ES, ES-, (ES) en todos los canales\n• Coincidencia estricta y aislada de EPG por canal\n• Optimización de imágenes y rendimiento en Android TV"
+                    changelog = """
+                        • GoalTV v1.5 - Novedades de la Versión:
+
+                        • 🧼 Limpieza de Nombres de Canales: Ocultación de prefijos ES, ES-, (ES), ES (O), ES: en la lista de TV.
+                        • 🎯 Coincidencia Estricta e Independiente de EPG: Mantiene vacía la guía de canales sin EPG propia sin mostrar otros canales.
+                        • 📺 Visualización en Android TV: Sincronización horaria exacta (Europe/Madrid), programa en directo resaltado en ámbar y marco naranja.
+                        • ⚽ Programación Deportiva Diaria: Guía de eventos en vivo con vista de 3 pestañas (HOY, MAÑANA y PASADO MAÑANA) y auto-desplazamiento al directo.
+                        • 🎬 Cine y Series (VOD): Carga optimizada de carátulas e imágenes en alta definición con consulta automática a TMDB.
+                        • 💾 Copia de Seguridad y Restauración: Reemplazo automático al guardar y restauración directa desde la carpeta Descargas.
+                        • 🛡️ Firma de Seguridad V2 y V3: Instalación limpia sin avisos de seguridad.
+                    """.trimIndent()
                 ),
                 onDismiss = { showCurrentVersionDialog = false }
             )
