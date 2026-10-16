@@ -162,6 +162,8 @@ class XtreamRepositoryImpl(
             .replace(Regex("""(?i)^\s*\((?:ES|ESP)\)\s*"""), "")
             .replace(Regex("""(?i)^\s*\[(?:ES|ESP)]\s*"""), "")
             .replace(Regex("""(?i)^\s*ES\b\s*"""), "")
+            .replace(Regex("""(?i)^\s*4k\s*-\s*"""), "")
+            .replace(Regex("""(?i)^\s*4k-\s*"""), "")
             .trim()
             .ifBlank { rawName.trim() }
     }

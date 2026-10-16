@@ -142,6 +142,8 @@ fun LiveTvScreen(
                 viewModel.loadData()
             }
 
+            val categoryChipFocusRequester = remember { FocusRequester() }
+
             // Category Chips Row
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -153,7 +155,8 @@ fun LiveTvScreen(
                     val isAllSelected = uiState.selectedCategory == null && !uiState.isFavoritesSelected
                     FocusableCard(
                         onClick = { viewModel.selectCategory(null) },
-                        shape = RoundedCornerShape(18.dp)
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = if (isAllSelected) Modifier.focusRequester(categoryChipFocusRequester) else Modifier
                     ) {
                         Box(
                             modifier = Modifier
@@ -180,7 +183,8 @@ fun LiveTvScreen(
                     val isFavSelected = uiState.isFavoritesSelected
                     FocusableCard(
                         onClick = { viewModel.selectFavorites() },
-                        shape = RoundedCornerShape(18.dp)
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = if (isFavSelected) Modifier.focusRequester(categoryChipFocusRequester) else Modifier
                     ) {
                         Box(
                             modifier = Modifier
@@ -207,7 +211,8 @@ fun LiveTvScreen(
                     val isSelected = uiState.selectedCategory?.id == category.id
                     FocusableCard(
                         onClick = { viewModel.selectCategory(category) },
-                        shape = RoundedCornerShape(18.dp)
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = if (isSelected) Modifier.focusRequester(categoryChipFocusRequester) else Modifier
                     ) {
                         Box(
                             modifier = Modifier

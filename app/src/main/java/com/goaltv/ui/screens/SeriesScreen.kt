@@ -42,6 +42,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
@@ -284,6 +286,19 @@ fun SeriesCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var displayPosterUrl by remember(series.id, series.posterUrl) { mutableStateOf(series.posterUrl) }
+
+    LaunchedEffect(series.id, series.posterUrl) {
+        if (displayPosterUrl.isNullOrBlank()) {
+            try {
+                val info = com.goaltv.data.network.TmdbHelper.fetchTmdbInfo(series.name, isMovie = false)
+                if (info?.posterPath != null) {
+                    displayPosterUrl = info.posterPath
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     FocusableCard(
         onClick = onClick,
         modifier = modifier
@@ -292,13 +307,11 @@ fun SeriesCard(
         shape = RoundedCornerShape(12.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            if (!series.posterUrl.isNullOrBlank()) {
+            if (!displayPosterUrl.isNullOrBlank()) {
                 AsyncImage(
-                    model = series.posterUrl,
+                    model = displayPosterUrl,
                     contentDescription = series.name,
                     contentScale = ContentScale.Crop,
-                    error = painterResource(id = R.drawable.placeholder),
-                    placeholder = painterResource(id = R.drawable.placeholder),
                     modifier = Modifier
                         .fillMaxSize()
                         .background(SurfaceDarkCard)

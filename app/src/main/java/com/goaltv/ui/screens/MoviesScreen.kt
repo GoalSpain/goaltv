@@ -38,14 +38,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.Dp
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -161,6 +161,8 @@ fun MoviesScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
+            val categoryChipFocusRequester = remember { FocusRequester() }
+
             // Category Chips
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -172,7 +174,8 @@ fun MoviesScreen(
                     val isAllSelected = uiState.selectedVodCategory == null && !uiState.isMovieFavoritesSelected
                     FocusableCard(
                         onClick = { viewModel.selectVodCategory(null) },
-                        shape = RoundedCornerShape(18.dp)
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = if (isAllSelected) Modifier.focusRequester(categoryChipFocusRequester) else Modifier
                     ) {
                         Box(
                             modifier = Modifier
@@ -199,7 +202,8 @@ fun MoviesScreen(
                     val isFavSelected = uiState.isMovieFavoritesSelected
                     FocusableCard(
                         onClick = { viewModel.selectMovieFavorites() },
-                        shape = RoundedCornerShape(18.dp)
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = if (isFavSelected) Modifier.focusRequester(categoryChipFocusRequester) else Modifier
                     ) {
                         Box(
                             modifier = Modifier
@@ -226,7 +230,8 @@ fun MoviesScreen(
                     val isSelected = uiState.selectedVodCategory?.id == cat.id
                     FocusableCard(
                         onClick = { viewModel.selectVodCategory(cat) },
-                        shape = RoundedCornerShape(18.dp)
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = if (isSelected) Modifier.focusRequester(categoryChipFocusRequester) else Modifier
                     ) {
                         Box(
                             modifier = Modifier
@@ -339,6 +344,19 @@ fun MoviePosterCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var displayPosterUrl by remember(movie.id, movie.posterUrl) { mutableStateOf(movie.posterUrl) }
+
+    LaunchedEffect(movie.id, movie.posterUrl) {
+        if (displayPosterUrl.isNullOrBlank()) {
+            try {
+                val info = com.goaltv.data.network.TmdbHelper.fetchTmdbInfo(movie.name, isMovie = true)
+                if (info?.posterPath != null) {
+                    displayPosterUrl = info.posterPath
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     FocusableCard(
         onClick = onClick,
         modifier = modifier
@@ -347,13 +365,11 @@ fun MoviePosterCard(
         shape = RoundedCornerShape(8.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            if (!movie.posterUrl.isNullOrBlank()) {
+            if (!displayPosterUrl.isNullOrBlank()) {
                 AsyncImage(
-                    model = movie.posterUrl,
+                    model = displayPosterUrl,
                     contentDescription = movie.name,
                     contentScale = ContentScale.Crop,
-                    error = painterResource(id = R.drawable.placeholder),
-                    placeholder = painterResource(id = R.drawable.placeholder),
                     modifier = Modifier
                         .fillMaxSize()
                         .background(SurfaceDarkCard)
