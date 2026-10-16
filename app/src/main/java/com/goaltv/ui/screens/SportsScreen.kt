@@ -84,11 +84,14 @@ fun SportsScreen(
                     val keyCode = event.nativeKeyEvent.keyCode
                     val isLeft = event.key == Key.DirectionLeft || keyCode == 21
                     val isRight = event.key == Key.DirectionRight || keyCode == 22
+                    val tabs = listOf("Hoy", "Mañana", "Pasado Mañana")
                     if (isLeft) {
-                        viewModel.selectDateTab("Hoy")
+                        val idx = tabs.indexOfFirst { it.equals(uiState.selectedDateTab, ignoreCase = true) }
+                        if (idx > 0) viewModel.selectDateTab(tabs[idx - 1])
                         true
                     } else if (isRight) {
-                        viewModel.selectDateTab("Mañana")
+                        val idx = tabs.indexOfFirst { it.equals(uiState.selectedDateTab, ignoreCase = true) }
+                        if (idx >= 0 && idx < tabs.size - 1) viewModel.selectDateTab(tabs[idx + 1])
                         true
                     } else false
                 } else false
@@ -160,13 +163,15 @@ fun SportsScreen(
 
             val todayDateStr = remember { getFormattedDate(0) }
             val tomorrowDateStr = remember { getFormattedDate(1) }
+            val pasadoDateStr = remember { getFormattedDate(2) }
 
             val dateTabs = listOf(
                 "Hoy" to "HOY ($todayDateStr)",
-                "Mañana" to "MAÑANA ($tomorrowDateStr)"
+                "Mañana" to "MAÑANA ($tomorrowDateStr)",
+                "Pasado Mañana" to "PASADO MAÑANA ($pasadoDateStr)"
             )
 
-            // DATE TABS: HOY & MAÑANA
+            // DATE TABS: HOY, MAÑANA & PASADO MAÑANA
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
