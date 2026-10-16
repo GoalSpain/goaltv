@@ -158,16 +158,10 @@ class XtreamRepositoryImpl(
     private fun cleanChannelDisplayName(rawName: String?): String {
         if (rawName.isNullOrBlank()) return "Channel"
         return rawName
+            .replace(Regex("""(?i)^\s*(?:ES|ESP)\s*(\([a-z0-9\s_-]+\)|\[[a-z0-9\s_-]+]|-|:|\|)*\s*"""), "")
             .replace(Regex("""(?i)^\s*\((?:ES|ESP)\)\s*"""), "")
             .replace(Regex("""(?i)^\s*\[(?:ES|ESP)]\s*"""), "")
-            .replace(Regex("""(?i)^\s*ES\s*-\s*"""), "")
-            .replace(Regex("""(?i)^\s*ES-\s*"""), "")
-            .replace(Regex("""(?i)^\s*ES:\s*"""), "")
-            .replace(Regex("""(?i)^\s*ES\|\s*"""), "")
-            .replace(Regex("""(?i)^\s*ES\s+4k-?\s*"""), "")
-            .replace(Regex("""(?i)^\s*ES\s+fhd-?\s*"""), "")
-            .replace(Regex("""(?i)^\s*ES\s+hd-?\s*"""), "")
-            .replace(Regex("""(?i)^\s*ES\s+(?=[A-Za-z0-9])"""), "")
+            .replace(Regex("""(?i)^\s*ES\b\s*"""), "")
             .trim()
             .ifBlank { rawName.trim() }
     }

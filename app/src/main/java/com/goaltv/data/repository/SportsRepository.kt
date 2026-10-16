@@ -144,8 +144,8 @@ class SportsRepositoryImpl : SportsRepository {
                             competition = competition,
                             sportCategory = deporte,
                             dateTab = dateTab,
-                            dateTimeDisplay = "$hora • $canal",
-                            channelName = matchedChannel?.name ?: canal,
+                            dateTimeDisplay = hora,
+                            channelName = canal,
                             channelId = matchedChannel?.id,
                             streamUrl = matchedChannel?.streamUrl ?: "",
                             iconUrl = matchedChannel?.iconUrl

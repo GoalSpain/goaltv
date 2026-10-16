@@ -652,26 +652,12 @@ class DataRepositoryImpl(
 
     private fun isChannelMatch(cleanTarget: String, cleanXmlName: String): Boolean {
         if (cleanTarget.isBlank() || cleanXmlName.isBlank()) return false
-
         val t = cleanTarget.replace(" ", "")
         val x = cleanXmlName.replace(" ", "")
         if (t == x) return true
-
-        if (cleanTarget == "ten" || cleanXmlName == "ten") {
-            return cleanTarget == "ten" && cleanXmlName == "ten"
-        }
-
-        if (cleanTarget == "la 1") return cleanXmlName.startsWith("la 1")
-        if (cleanTarget == "la 2") return cleanXmlName.startsWith("la 2")
-
-        // Strict channel number matching (e.g. "m+ liga de campeones 1" vs "2")
-        val targetNum = Regex("""\b(\d+)\b""").find(cleanTarget)?.value
-        val xmlNum = Regex("""\b(\d+)\b""").find(cleanXmlName)?.value
-        if (targetNum != null || xmlNum != null) {
-            return targetNum == xmlNum && (cleanTarget.contains(cleanXmlName) || cleanXmlName.contains(cleanTarget))
-        }
-
-        return cleanTarget.contains(cleanXmlName) || cleanXmlName.contains(cleanTarget)
+        if (cleanTarget == "la 1" && x.startsWith("la1")) return true
+        if (cleanTarget == "la 2" && x.startsWith("la2")) return true
+        return false
     }
 
     override suspend fun getEpgForChannel(channelId: String, streamId: String?): List<EpgProgram> = withContext(Dispatchers.IO) {

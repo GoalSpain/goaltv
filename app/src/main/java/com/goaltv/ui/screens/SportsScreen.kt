@@ -269,11 +269,7 @@ fun SportsEventCard(
 
     FocusableCard(
         onClick = {},
-        modifier = modifier
-            .fillMaxWidth()
-            .then(
-                if (isLive) Modifier.border(1.5.dp, OrangePrimary, RoundedCornerShape(14.dp)) else Modifier
-            ),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isLive) Color(0xFF282218) else SurfaceDarkCard
