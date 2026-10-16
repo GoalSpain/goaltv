@@ -366,37 +366,51 @@ class DataRepositoryImpl(
         return try {
             var rawJson = ""
 
-            // 1. Check SharedPreferences Backup
-            rawJson = prefs?.getString("goaltv_local_backup", "") ?: ""
-
-            // 2. Check Internal Files Dir
-            if (rawJson.isBlank()) {
-                appContext?.let { ctx ->
-                    val intFile = java.io.File(ctx.filesDir, "goaltv_backup.json")
-                    if (intFile.exists() && intFile.length() > 0) {
-                        rawJson = intFile.readText()
-                    }
-                }
-            }
-
-            // 3. Check App External Files Dir
-            if (rawJson.isBlank()) {
-                appContext?.let { ctx ->
-                    val extDir = ctx.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS) ?: ctx.getExternalFilesDir(null)
-                    val extFile = java.io.File(extDir, "goaltv_backup.json")
-                    if (extFile.exists() && extFile.length() > 0) {
-                        rawJson = extFile.readText()
-                    }
-                }
-            }
-
-            // 4. Check Public Downloads
-            if (rawJson.isBlank()) {
+            // 1. Check Public Downloads Directory FIRST
+            try {
                 val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
-                val pubFile = java.io.File(downloadsDir, "goaltv_backup.json")
-                if (pubFile.exists() && pubFile.length() > 0) {
-                    rawJson = pubFile.readText()
+                if (downloadsDir != null && downloadsDir.exists()) {
+                    val pubFile = java.io.File(downloadsDir, "goaltv_backup.json")
+                    if (pubFile.exists() && pubFile.length() > 0) {
+                        rawJson = pubFile.readText()
+                    }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            // 2. Check App External Downloads Dir
+            if (rawJson.isBlank()) {
+                try {
+                    appContext?.let { ctx ->
+                        val extDir = ctx.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS) ?: ctx.getExternalFilesDir(null)
+                        val extFile = java.io.File(extDir, "goaltv_backup.json")
+                        if (extFile.exists() && extFile.length() > 0) {
+                            rawJson = extFile.readText()
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            // 3. Check Internal Files Dir
+            if (rawJson.isBlank()) {
+                try {
+                    appContext?.let { ctx ->
+                        val intFile = java.io.File(ctx.filesDir, "goaltv_backup.json")
+                        if (intFile.exists() && intFile.length() > 0) {
+                            rawJson = intFile.readText()
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            // 4. Check SharedPreferences Backup
+            if (rawJson.isBlank()) {
+                rawJson = prefs?.getString("goaltv_local_backup", "") ?: ""
             }
 
             if (rawJson.isBlank()) return false

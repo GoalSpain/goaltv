@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.SystemUpdate
@@ -92,12 +95,20 @@ fun UpdateDialog(
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = updateInfo.changelog,
-                    color = TextMuted,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp
-                )
+
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 240.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = updateInfo.changelog,
+                        color = TextMuted,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                }
 
                 if (isDownloading) {
                     Spacer(modifier = Modifier.height(14.dp))

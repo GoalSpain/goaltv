@@ -93,8 +93,8 @@ fun MovieDetailDialog(
                             contentDescription = movie.name,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .width(120.dp)
-                                .height(170.dp)
+                                .width(100.dp)
+                                .height(140.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(Color(0xFF2B2B3D))
                         )
@@ -105,25 +105,27 @@ fun MovieDetailDialog(
                         ) {
                             Text(
                                 text = movie.name,
-                                fontSize = 20.sp,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = Color.White,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
 
                             // Badges Row
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                StarRatingBar(rating = movie.rating, starSize = 14.dp, showNumericRating = true)
+                                StarRatingBar(rating = movie.rating, starSize = 12.dp, showNumericRating = true)
 
                                 formatReleaseYear(movie.releaseDate)?.let { year ->
                                     Text(
                                         text = year,
                                         color = TextSecondary,
-                                        fontSize = 13.sp
+                                        fontSize = 11.sp
                                     )
                                 }
 
@@ -131,12 +133,12 @@ fun MovieDetailDialog(
                                     Text(
                                         text = "$dur mins",
                                         color = TextSecondary,
-                                        fontSize = 13.sp
+                                        fontSize = 11.sp
                                     )
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
                             // Overview / Description with Full Dialog option
                             var showFullOverviewDialog by remember { mutableStateOf(false) }
@@ -155,20 +157,20 @@ fun MovieDetailDialog(
                                 Text(
                                     text = movie.description ?: "No hay descripción disponible para esta película.",
                                     color = TextMuted,
-                                    fontSize = 13.sp,
-                                    maxLines = 4,
+                                    fontSize = 11.sp,
+                                    maxLines = 3,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.clickable { showFullOverviewDialog = true }
                                 )
-                                if ((movie.description?.length ?: 0) > 100) {
+                                if ((movie.description?.length ?: 0) > 80) {
                                     Text(
                                         text = "Ver descripción completa...",
                                         color = OrangePrimary,
-                                        fontSize = 12.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier
                                             .clickable { showFullOverviewDialog = true }
-                                            .padding(top = 4.dp)
+                                            .padding(top = 2.dp)
                                     )
                                 }
                             }

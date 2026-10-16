@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import com.goaltv.ui.components.FocusableCard
 import com.goaltv.ui.components.GoalTvLogo
@@ -463,6 +464,21 @@ fun SettingsScreen(
             }
         }
 
+        var showCurrentVersionDialog by remember { mutableStateOf(false) }
+
+        if (showCurrentVersionDialog) {
+            UpdateDialog(
+                updateInfo = UpdateInfo(
+                    isUpdateAvailable = false,
+                    versionCode = 5,
+                    versionName = appVersionName,
+                    apkUrl = "https://github.com/GoalSpain/goaltv/releases/latest/download/goaltv.apk",
+                    changelog = "• GoalTV v1.5 Versión Oficial\n• Ocultación de prefijos ES, ES-, (ES) en todos los canales\n• Coincidencia estricta y aislada de EPG por canal\n• Optimización de imágenes y rendimiento en Android TV"
+                ),
+                onDismiss = { showCurrentVersionDialog = false }
+            )
+        }
+
         if (manualUpdateInfo != null) {
             UpdateDialog(
                 updateInfo = manualUpdateInfo!!,
@@ -491,6 +507,7 @@ fun SettingsScreen(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
                             .background(Color(0xFF2A2A40))
+                            .clickable { showCurrentVersionDialog = true }
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(

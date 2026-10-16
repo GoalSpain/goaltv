@@ -23,6 +23,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -238,7 +239,26 @@ fun SportsScreen(
                     }
                 }
             } else {
+                val listState = rememberLazyListState()
+                val firstLiveIndex = remember(uiState.filteredEvents, uiState.selectedDateTab) {
+                    if (uiState.selectedDateTab.equals("Hoy", ignoreCase = true)) {
+                        val idx = uiState.filteredEvents.indexOfFirst {
+                            isSportsEventCurrentlyLive(it.dateTimeDisplay, true)
+                        }
+                        if (idx >= 0) idx else 0
+                    } else 0
+                }
+
+                LaunchedEffect(firstLiveIndex) {
+                    if (firstLiveIndex > 0) {
+                        try {
+                            listState.animateScrollToItem(firstLiveIndex)
+                        } catch (_: Exception) {}
+                    }
+                }
+
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
