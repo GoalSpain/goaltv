@@ -65,15 +65,6 @@ class SportsRepositoryImpl : SportsRepository {
         }
     }
 
-    private fun getSpanishDayAndMonth(dayOffset: Int): Pair<Int, String> {
-        val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Europe/Madrid")).apply {
-            add(java.util.Calendar.DAY_OF_YEAR, dayOffset)
-        }
-        val dayNumber = cal.get(java.util.Calendar.DAY_OF_MONTH)
-        val monthName = java.text.SimpleDateFormat("MMMM", java.util.Locale("es", "ES")).format(cal.time).lowercase()
-        return Pair(dayNumber, monthName)
-    }
-
     private suspend fun fetchMarcaTvGuide(liveChannels: List<LiveChannel>): List<SportsEvent> = withContext(Dispatchers.IO) {
         val events = mutableListOf<SportsEvent>()
         try {
@@ -96,22 +87,13 @@ class SportsRepositoryImpl : SportsRepository {
                 // Split HTML by date section headers <span class="title-section-widget">
                 val sections = html.split(Regex("""<span[^>]*class="title-section-widget"[^>]*>""", RegexOption.IGNORE_CASE))
 
-                val (todayNum, todayMonth) = getSpanishDayAndMonth(0)
-                val (tomorrowNum, tomorrowMonth) = getSpanishDayAndMonth(1)
-
                 var idCounter = 1
                 sections.forEachIndexed { sectionIdx, sectionContent ->
                     if (sectionIdx == 0) return@forEachIndexed
 
-                    val headerMatch = Regex("""(?s)^(.*?)</span>""", RegexOption.IGNORE_CASE).find(sectionContent)
-                    val rawHeader = headerMatch?.groupValues?.get(1)?.replace(Regex("<[^>]*>"), " ")?.lowercase() ?: ""
-
-                    val isTodayHeader = rawHeader.contains("$todayNum") && rawHeader.contains(todayMonth)
-                    val isTomorrowHeader = rawHeader.contains("$tomorrowNum") && rawHeader.contains(tomorrowMonth)
-
-                    val dateTab = when {
-                        isTodayHeader || (sectionIdx == 1 && !isTomorrowHeader) -> "Hoy"
-                        isTomorrowHeader || sectionIdx == 2 -> "Mañana"
+                    val dateTab = when (sectionIdx) {
+                        1 -> "Hoy"
+                        2 -> "Mañana"
                         else -> "Próximos Días"
                     }
 
