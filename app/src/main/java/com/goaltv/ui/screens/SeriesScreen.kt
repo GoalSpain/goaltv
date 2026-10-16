@@ -45,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -159,6 +160,8 @@ fun SeriesScreen(
                 GoalTvLogo(sizeScale = if (isCompactWidth) 0.65f else 0.75f, showGlow = false)
             }
 
+            val categoryChipFocusRequester = remember { FocusRequester() }
+
             // Category Chips
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -170,7 +173,8 @@ fun SeriesScreen(
                     val isAllSelected = uiState.selectedSeriesCategory == null && !uiState.isSeriesFavoritesSelected
                     FocusableCard(
                         onClick = { viewModel.selectSeriesCategory(null) },
-                        shape = RoundedCornerShape(18.dp)
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = if (isAllSelected) Modifier.focusRequester(categoryChipFocusRequester) else Modifier
                     ) {
                         Box(
                             modifier = Modifier
@@ -197,7 +201,8 @@ fun SeriesScreen(
                     val isFavSelected = uiState.isSeriesFavoritesSelected
                     FocusableCard(
                         onClick = { viewModel.selectSeriesFavorites() },
-                        shape = RoundedCornerShape(18.dp)
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = if (isFavSelected) Modifier.focusRequester(categoryChipFocusRequester) else Modifier
                     ) {
                         Box(
                             modifier = Modifier
@@ -224,7 +229,8 @@ fun SeriesScreen(
                     val isSelected = uiState.selectedSeriesCategory?.id == cat.id
                     FocusableCard(
                         onClick = { viewModel.selectSeriesCategory(cat) },
-                        shape = RoundedCornerShape(18.dp)
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = if (isSelected) Modifier.focusRequester(categoryChipFocusRequester) else Modifier
                     ) {
                         Box(
                             modifier = Modifier
@@ -263,9 +269,11 @@ fun SeriesScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 110.dp),
                     contentPadding = PaddingValues(bottom = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxSize()
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .focusProperties { up = categoryChipFocusRequester }
                 ) {
                     itemsIndexed(uiState.seriesList, key = { _, s -> s.id }) { index, series ->
                         SeriesCard(

@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -246,6 +247,8 @@ fun LiveTvScreen(
                     CircularProgressIndicator(color = OrangePrimary)
                 }
             } else {
+                val selectedChannelFocusRequester = remember { FocusRequester() }
+
                 // Main Content: Channels List on Left, EPG Guide on Right
                 Row(
                     modifier = Modifier.fillMaxSize(),
@@ -283,7 +286,9 @@ fun LiveTvScreen(
                         LazyColumn(
                             state = listState,
                             verticalArrangement = Arrangement.spacedBy(3.dp),
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .focusProperties { up = categoryChipFocusRequester }
                         ) {
                             items(uiState.channels, key = { it.id }) { channel ->
                                 val isSelected = uiState.selectedChannel?.id == channel.id
@@ -308,6 +313,7 @@ fun LiveTvScreen(
                             .clip(RoundedCornerShape(16.dp))
                             .background(SurfaceDark)
                             .padding(10.dp)
+                            .focusProperties { left = selectedChannelFocusRequester }
                     ) {
                         val channel = uiState.selectedChannel
 

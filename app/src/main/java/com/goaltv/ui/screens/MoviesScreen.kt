@@ -39,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -272,7 +273,9 @@ fun MoviesScreen(
                     contentPadding = PaddingValues(bottom = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .focusProperties { up = categoryChipFocusRequester }
                 ) {
                     itemsIndexed(filteredMovies, key = { _, m -> m.id }) { index, movie ->
                         MoviePosterCard(
