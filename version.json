@@ -1,6 +1,6 @@
 {
-  "versionCode": 4,
-  "versionName": "1.4",
-  "download_url": "https://github.com/GoalSpain/goaltv/releases/download/v1.4/goaltv.apk",
-  "changelog": "• GoalTV v1.4 Versión Oficial\n• Ocultación de prefijos EU- ES en categorías\n• Limpieza de nombres de canales y mejoras en Android TV"
+  "versionCode": 5,
+  "versionName": "1.5",
+  "download_url": "https://github.com/GoalSpain/goaltv/releases/download/v1.5/goaltv.apk",
+  "changelog": "• GoalTV v1.5 Versión Oficial\n• Ocultación de prefijos ES, ES-, (ES) en todos los canales\n• Coincidencia estricta y aislada de EPG por canal\n• Optimización de imágenes y rendimiento en Android TV"
 }
