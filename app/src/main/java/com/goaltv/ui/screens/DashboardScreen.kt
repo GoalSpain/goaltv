@@ -29,8 +29,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Movie
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Tv
@@ -267,14 +267,13 @@ fun DashboardScreen(
                             .focusRequester(deportesFocusRequester)
                     )
 
-                    // Tile 2: ACTUALIZAR LISTA
+                    // Tile 2: CATCH-UP
                     StackedVioletTile(
-                        title = "ACTUALIZAR LISTA",
-                        subtitle = "",
-                        icon = Icons.Rounded.Refresh,
+                        title = "CATCH-UP",
+                        subtitle = "Grabaciones TV",
+                        icon = Icons.Rounded.History,
                         isCompact = isCompactWidth || isCompactHeight,
-                        isAnimating = isReloading,
-                        onClick = { viewModel.reloadPlaylist() },
+                        onClick = { viewModel.navigateTo(AppScreen.CATCH_UP) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)

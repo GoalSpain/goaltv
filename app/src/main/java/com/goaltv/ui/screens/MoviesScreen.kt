@@ -20,8 +20,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -227,7 +228,7 @@ fun MoviesScreen(
                     }
                 }
 
-                items(uiState.vodCategories, key = { it.id }) { cat ->
+                itemsIndexed(uiState.vodCategories, key = { idx, cat -> "${cat.id}_$idx" }) { _, cat ->
                     val isSelected = uiState.selectedVodCategory?.id == cat.id
                     FocusableCard(
                         onClick = { viewModel.selectVodCategory(cat) },
@@ -277,7 +278,7 @@ fun MoviesScreen(
                         .fillMaxSize()
                         .focusProperties { up = categoryChipFocusRequester }
                 ) {
-                    itemsIndexed(filteredMovies, key = { _, m -> m.id }) { index, movie ->
+                    gridItemsIndexed(filteredMovies, key = { idx, m -> "${m.id}_$idx" }) { index, movie ->
                         MoviePosterCard(
                             movie = movie,
                             onClick = { viewModel.selectMovie(movie) },

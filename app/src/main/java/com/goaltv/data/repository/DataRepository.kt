@@ -62,6 +62,9 @@ interface DataRepository {
     suspend fun getSeriesList(categoryId: String? = null): List<Series>
     suspend fun getSeriesEpisodes(seriesId: String): List<Episode>
     suspend fun getEpgForChannel(channelId: String, streamId: String? = null): List<EpgProgram>
+    suspend fun getCatchupChannels(): List<LiveChannel>
+    suspend fun getCatchupEpg(streamId: String): List<EpgProgram>
+    fun buildCatchupStreamUrl(streamId: String, startTimestampSec: Long, durationMinutes: Int): String
     suspend fun getSportsEvents(): List<SportsEvent>
 
     fun searchContent(query: String): SearchResult
@@ -138,6 +141,11 @@ class DataRepositoryImpl(
     private val favoriteMovieIds = mutableSetOf<String>()
     private val favoriteSeriesIds = mutableSetOf<String>()
 
+    // Per-category on-demand cache to prevent OutOfMemory and freezes on massive IPTV servers
+    private val liveChannelsCategoryCache = java.util.concurrent.ConcurrentHashMap<String, List<LiveChannel>>()
+    private val vodMoviesCategoryCache = java.util.concurrent.ConcurrentHashMap<String, List<VodMovie>>()
+    private val seriesCategoryCache = java.util.concurrent.ConcurrentHashMap<String, List<Series>>()
+
     // In-memory cache for loaded real data
     private var xtreamLiveCategories = listOf<Category>()
     private var xtreamLiveChannels = listOf<LiveChannel>()
@@ -164,6 +172,9 @@ class DataRepositoryImpl(
         _isLoggedIn.value = false
         _activeXtreamAccount.value = null
         _activeMode.value = DataSourceMode.MOCK
+        liveChannelsCategoryCache.clear()
+        vodMoviesCategoryCache.clear()
+        seriesCategoryCache.clear()
         xtreamLiveCategories = emptyList()
         xtreamLiveChannels = emptyList()
         xtreamVodCategories = emptyList()
@@ -195,16 +206,17 @@ class DataRepositoryImpl(
     ): Result<AuthResponse> {
         val result = xtreamRepository.authenticate(serverUrl, username, password)
         result.onSuccess { auth ->
-            saveSession(serverUrl, username, password, auth)
+            val workingServer = ServerCluster.activeWorkingServerUrl.ifBlank { serverUrl }
+            saveSession(workingServer, username, password, auth)
 
             // Pre-fetch categories and lists in background if authenticated
             runCatching {
-                xtreamLiveCategories = xtreamRepository.getLiveCategories(serverUrl, username, password).getOrDefault(emptyList())
-                xtreamLiveChannels = xtreamRepository.getLiveChannels(serverUrl, username, password).getOrDefault(emptyList())
-                xtreamVodCategories = xtreamRepository.getVodCategories(serverUrl, username, password).getOrDefault(emptyList())
-                xtreamVodMovies = xtreamRepository.getVodMovies(serverUrl, username, password).getOrDefault(emptyList())
-                xtreamSeriesCategories = xtreamRepository.getSeriesCategories(serverUrl, username, password).getOrDefault(emptyList())
-                xtreamSeriesList = xtreamRepository.getSeriesList(serverUrl, username, password).getOrDefault(emptyList())
+                xtreamLiveCategories = xtreamRepository.getLiveCategories(workingServer, username, password).getOrDefault(emptyList())
+                xtreamLiveChannels = xtreamRepository.getLiveChannels(workingServer, username, password).getOrDefault(emptyList())
+                xtreamVodCategories = xtreamRepository.getVodCategories(workingServer, username, password).getOrDefault(emptyList())
+                xtreamVodMovies = xtreamRepository.getVodMovies(workingServer, username, password).getOrDefault(emptyList())
+                xtreamSeriesCategories = xtreamRepository.getSeriesCategories(workingServer, username, password).getOrDefault(emptyList())
+                xtreamSeriesList = xtreamRepository.getSeriesList(workingServer, username, password).getOrDefault(emptyList())
             }
         }
         return result
@@ -449,8 +461,10 @@ class DataRepositoryImpl(
                 val authResult = xtreamRepository.authenticate(acc.serverUrl, acc.username, acc.password)
                 val authRes = authResult.getOrNull()
 
+                val workingServer = ServerCluster.activeWorkingServerUrl.ifBlank { acc.serverUrl }
+
                 if (authRes != null && authRes.userInfo?.auth == 1) {
-                    _activeXtreamAccount.value = acc.copy(authResponse = authRes)
+                    saveSession(workingServer, acc.username, acc.password, authRes)
                     _isLoggedIn.value = true
                     prefs?.edit()?.putBoolean("is_logged_in", true)?.apply()
                 } else if (authRes != null && authRes.userInfo?.auth == 0) {
@@ -458,15 +472,15 @@ class DataRepositoryImpl(
                     prefs?.edit()?.putBoolean("is_logged_in", false)?.apply()
                     return@runCatching
                 } else if (authRes != null) {
-                    _activeXtreamAccount.value = acc.copy(authResponse = authRes)
+                    saveSession(workingServer, acc.username, acc.password, authRes)
                 }
 
-                xtreamLiveCategories = xtreamRepository.getLiveCategories(acc.serverUrl, acc.username, acc.password).getOrDefault(emptyList())
-                xtreamLiveChannels = xtreamRepository.getLiveChannels(acc.serverUrl, acc.username, acc.password).getOrDefault(emptyList())
-                xtreamVodCategories = xtreamRepository.getVodCategories(acc.serverUrl, acc.username, acc.password).getOrDefault(emptyList())
-                xtreamVodMovies = xtreamRepository.getVodMovies(acc.serverUrl, acc.username, acc.password).getOrDefault(emptyList())
-                xtreamSeriesCategories = xtreamRepository.getSeriesCategories(acc.serverUrl, acc.username, acc.password).getOrDefault(emptyList())
-                xtreamSeriesList = xtreamRepository.getSeriesList(acc.serverUrl, acc.username, acc.password).getOrDefault(emptyList())
+                // Solamente cargamos categorías, sin borrar los cachés de canales que ya tuviéramos de sesiones anteriores.
+                val targetServer = ServerCluster.activeWorkingServerUrl.ifBlank { acc.serverUrl }
+
+                xtreamLiveCategories = xtreamRepository.getLiveCategories(targetServer, acc.username, acc.password).getOrDefault(emptyList())
+                xtreamVodCategories = xtreamRepository.getVodCategories(targetServer, acc.username, acc.password).getOrDefault(emptyList())
+                xtreamSeriesCategories = xtreamRepository.getSeriesCategories(targetServer, acc.username, acc.password).getOrDefault(emptyList())
             }
         }
     }
@@ -516,15 +530,23 @@ class DataRepositoryImpl(
 
     override suspend fun getLiveChannels(categoryId: String?): List<LiveChannel> {
         val hidden = getHiddenCategoryIds()
+        val catKey = categoryId.orEmpty().ifBlank { "ALL" }
+
         val rawChannels = when (_activeMode.value) {
             DataSourceMode.MOCK -> emptyList()
             DataSourceMode.XTREAM -> {
                 val acc = _activeXtreamAccount.value
-                if (acc != null && xtreamLiveChannels.isEmpty()) {
-                    xtreamLiveChannels = xtreamRepository.getLiveChannels(acc.serverUrl, acc.username, acc.password)
-                        .getOrDefault(emptyList())
-                }
-                xtreamLiveChannels
+                if (acc != null) {
+                    val cached = liveChannelsCategoryCache[catKey]
+                    if (cached != null) {
+                        cached
+                    } else {
+                        val fetched = xtreamRepository.getLiveChannels(acc.serverUrl, acc.username, acc.password, categoryId)
+                            .getOrDefault(emptyList())
+                        liveChannelsCategoryCache[catKey] = fetched
+                        fetched
+                    }
+                } else emptyList()
             }
             DataSourceMode.M3U -> {
                 cachedM3uResult?.liveChannels ?: emptyList()
@@ -565,15 +587,22 @@ class DataRepositoryImpl(
     }
 
     override suspend fun getVodMovies(categoryId: String?): List<VodMovie> {
+        val catKey = categoryId.orEmpty().ifBlank { "ALL" }
         val rawMovies = when (_activeMode.value) {
             DataSourceMode.MOCK -> emptyList()
             DataSourceMode.XTREAM -> {
                 val acc = _activeXtreamAccount.value
-                if (acc != null && xtreamVodMovies.isEmpty()) {
-                    xtreamVodMovies = xtreamRepository.getVodMovies(acc.serverUrl, acc.username, acc.password)
-                        .getOrDefault(emptyList())
-                }
-                xtreamVodMovies
+                if (acc != null) {
+                    val cached = vodMoviesCategoryCache[catKey]
+                    if (cached != null) {
+                        cached
+                    } else {
+                        val fetched = xtreamRepository.getVodMovies(acc.serverUrl, acc.username, acc.password, categoryId)
+                            .getOrDefault(emptyList())
+                        vodMoviesCategoryCache[catKey] = fetched
+                        fetched
+                    }
+                } else emptyList()
             }
             DataSourceMode.M3U -> {
                 cachedM3uResult?.vodMovies ?: emptyList()
@@ -610,15 +639,22 @@ class DataRepositoryImpl(
     }
 
     override suspend fun getSeriesList(categoryId: String?): List<Series> {
+        val catKey = categoryId.orEmpty().ifBlank { "ALL" }
         val rawSeries = when (_activeMode.value) {
             DataSourceMode.MOCK -> emptyList()
             DataSourceMode.XTREAM -> {
                 val acc = _activeXtreamAccount.value
-                if (acc != null && xtreamSeriesList.isEmpty()) {
-                    xtreamSeriesList = xtreamRepository.getSeriesList(acc.serverUrl, acc.username, acc.password)
-                        .getOrDefault(emptyList())
-                }
-                xtreamSeriesList
+                if (acc != null) {
+                    val cached = seriesCategoryCache[catKey]
+                    if (cached != null) {
+                        cached
+                    } else {
+                        val fetched = xtreamRepository.getSeriesList(acc.serverUrl, acc.username, acc.password, categoryId)
+                            .getOrDefault(emptyList())
+                        seriesCategoryCache[catKey] = fetched
+                        fetched
+                    }
+                } else emptyList()
             }
             DataSourceMode.M3U -> {
                 cachedM3uResult?.seriesList ?: emptyList()
@@ -650,11 +686,76 @@ class DataRepositoryImpl(
         return emptyList()
     }
 
+    override suspend fun getCatchupChannels(): List<LiveChannel> {
+        val allChannels = liveChannelsCategoryCache.values.flatten()
+        val catchupOnly = allChannels.filter { it.hasCatchup }
+        return if (catchupOnly.isNotEmpty()) catchupOnly else allChannels
+    }
+
+    override suspend fun getCatchupEpg(streamId: String): List<EpgProgram> {
+        val nowSec = System.currentTimeMillis() / 1000L
+        val results = mutableListOf<EpgProgram>()
+
+        // Siempre utilizar únicamente la EPG de la URL (XMLTV) para evitar mezclas con Xtream API
+        runCatching {
+            val xmlEpg = getEpgForChannel(streamId, streamId)
+            if (xmlEpg.isNotEmpty()) {
+                results.addAll(xmlEpg)
+            }
+        }
+
+        // Filter past/current programs up to now
+        val validPrograms = results.filter { it.startTimestamp <= nowSec }.sortedByDescending { it.startTimestamp }
+
+        if (validPrograms.isNotEmpty()) {
+            return validPrograms
+        }
+
+        // 3. Fallback: Generate time-based catch-up slots for the last 24 hours (1-hour blocks)
+        val syntheticPrograms = mutableListOf<EpgProgram>()
+        val oneHourSec = 3600L
+        val currentHourStart = (nowSec / oneHourSec) * oneHourSec
+        val dateSdf = java.text.SimpleDateFormat("EEE d MMM • HH:mm", java.util.Locale.forLanguageTag("es-ES"))
+
+        for (i in 1..24) {
+            val pStart = currentHourStart - (i * oneHourSec)
+            val pEnd = pStart + oneHourSec
+            val timeLabel = dateSdf.format(java.util.Date(pStart * 1000L))
+            syntheticPrograms.add(
+                EpgProgram(
+                    id = "catchup_slot_${streamId}_$pStart",
+                    channelId = streamId,
+                    title = "Emisión $timeLabel",
+                    description = "Grabación en diferido (Timeshift $i h atrás)",
+                    startTimestamp = pStart,
+                    endTimestamp = pEnd
+                )
+            )
+        }
+
+        return syntheticPrograms
+    }
+
+    override fun buildCatchupStreamUrl(streamId: String, startTimestampSec: Long, durationMinutes: Int): String {
+        val acc = _activeXtreamAccount.value ?: return ""
+        return xtreamRepository.buildCatchupStreamUrl(
+            serverUrl = acc.serverUrl,
+            username = acc.username,
+            password = acc.password,
+            streamId = streamId,
+            startTimestampSec = startTimestampSec,
+            durationMinutes = durationMinutes
+        )
+    }
+
     private fun cleanChannelNameForEpg(rawName: String): String {
         var clean = rawName
-            .replace(Regex("""(?i)^\s*(ES\b|ES\s*4k-?|ES\s*fhd-?|ES\s*hd-?|ES\||ES:|-|\[ES]|\bHD\b|\bFHD\b|\b4K\b|\bSD\b)\s*"""), "")
-            .replace(Regex("""(?i)\s*(HD|FHD|4K|SD|\d+k|\.tv)$"""), "")
+            .replace(Regex("""(?i)^\s*(?:ES|ESP)\s*[:|_-]?\s*"""), "")
+            .replace(Regex("""(?i)\s*(?:\(ES\)|\[ES]|HD|FHD|4K|SD|\.es|\.tv)\b"""), "")
+            .replace(Regex("""(?i)\bmovistar\s*\+?"""), "m+")
             .replace(Regex("""(?i)\bmovistar\b"""), "m+")
+            .replace(Regex("""(?i)\blaliga\b"""), "laliga")
+            .replace(Regex("""(?i)\bla\s*liga\b"""), "laliga")
             .replace(Regex("""\s+"""), " ")
             .trim()
             .lowercase()
@@ -669,8 +770,17 @@ class DataRepositoryImpl(
         val t = cleanTarget.replace(" ", "")
         val x = cleanXmlName.replace(" ", "")
         if (t == x) return true
-        if (cleanTarget == "la 1" && x.startsWith("la1")) return true
-        if (cleanTarget == "la 2" && x.startsWith("la2")) return true
+        
+        // Evitar coincidencia parcial que mezcla canales (ej. "DAZN 1" coincidiendo con "DAZN 10")
+        // Eliminado: if (t.contains(x) || x.contains(t)) return true 
+        
+        if (t == "la1" && x.startsWith("la1")) return true
+        if (t == "la2" && x.startsWith("la2")) return true
+        
+        // Si no es coincidencia exacta, asegurarse de que la diferencia no sea un número al final
+        if (t.startsWith(x) && t.length == x.length + 1 && !t.last().isDigit()) return true
+        if (x.startsWith(t) && x.length == t.length + 1 && !x.last().isDigit()) return true
+        
         return false
     }
 
@@ -679,11 +789,13 @@ class DataRepositoryImpl(
             val xmlTvResult = sportsRepository.getXmlTvData()
             if (xmlTvResult.programs.isEmpty()) return@withContext emptyList()
 
-            if (xtreamLiveChannels.isEmpty()) {
-                getLiveChannels()
+            val allChannels = liveChannelsCategoryCache.values.flatten()
+            val targetChannel = allChannels.firstOrNull {
+                it.id == channelId || it.epgId == channelId || (streamId != null && (it.id == streamId || it.epgId == streamId))
+            } ?: xtreamLiveChannels.firstOrNull {
+                it.id == channelId || it.epgId == channelId || (streamId != null && (it.id == streamId || it.epgId == streamId))
             }
 
-            val targetChannel = xtreamLiveChannels.firstOrNull { it.id == channelId || it.epgId == channelId || (streamId != null && it.epgId == streamId) }
             val rawName = targetChannel?.name ?: channelId
             val cleanedName = cleanChannelNameForEpg(rawName)
             val tvgId = targetChannel?.epgId
@@ -691,6 +803,7 @@ class DataRepositoryImpl(
             val matchedXmlChannelIds = xmlTvResult.channels.entries.filter { (id, ch) ->
                 id.equals(tvgId, ignoreCase = true) ||
                 id.equals(channelId, ignoreCase = true) ||
+                (streamId != null && id.equals(streamId, ignoreCase = true)) ||
                 ch.displayNames.any { displayName ->
                     val cleanDisplay = cleanChannelNameForEpg(displayName)
                     isChannelMatch(cleanedName, cleanDisplay)
@@ -698,12 +811,18 @@ class DataRepositoryImpl(
             }.map { it.key }.toSet()
 
             val matchingProgs = xmlTvResult.programs.filter { p ->
-                p.channelId == channelId || (tvgId != null && p.channelId == tvgId) || matchedXmlChannelIds.contains(p.channelId)
+                p.channelId == channelId || (streamId != null && p.channelId == streamId) || (tvgId != null && p.channelId == tvgId) || matchedXmlChannelIds.contains(p.channelId)
             }
 
             if (matchingProgs.isNotEmpty()) {
                 val nowSec = System.currentTimeMillis() / 1000L
-                return@withContext matchingProgs.map { p ->
+                return@withContext matchingProgs
+                    // Filtrar programas con la misma hora de inicio y título similar
+                    .distinctBy { 
+                        val shortTitle = it.title.lowercase().split(" ").take(2).joinToString("")
+                        shortTitle + it.startTimeSeconds 
+                    }
+                    .map { p ->
                     val live = nowSec in p.startTimeSeconds..p.stopTimeSeconds
                     EpgProgram(
                         id = "${p.channelId}_${p.startTimeSeconds}",
@@ -724,7 +843,7 @@ class DataRepositoryImpl(
     }
 
     override suspend fun getSportsEvents(): List<SportsEvent> = withContext(Dispatchers.IO) {
-        val channels = getLiveChannels()
+        val channels = liveChannelsCategoryCache.values.flatten()
         sportsRepository.getSportsEvents(channels)
     }
 
@@ -732,9 +851,9 @@ class DataRepositoryImpl(
         if (query.isBlank()) return SearchResult()
         val q = query.trim().lowercase()
 
-        val matchingChannels = xtreamLiveChannels.filter { it.name.lowercase().contains(q) }
-        val matchingMovies = xtreamVodMovies.filter { it.name.lowercase().contains(q) || it.description?.lowercase()?.contains(q) == true }
-        val matchingSeries = xtreamSeriesList.filter { it.name.lowercase().contains(q) || it.overview?.lowercase()?.contains(q) == true }
+        val matchingChannels = liveChannelsCategoryCache.values.flatten().filter { it.name.lowercase().contains(q) }
+        val matchingMovies = vodMoviesCategoryCache.values.flatten().filter { it.name.lowercase().contains(q) || it.description?.lowercase()?.contains(q) == true }
+        val matchingSeries = seriesCategoryCache.values.flatten().filter { it.name.lowercase().contains(q) || it.overview?.lowercase()?.contains(q) == true }
 
         return SearchResult(
             channels = matchingChannels,

@@ -49,7 +49,7 @@ class SportsRepositoryImpl : SportsRepository {
                             inputStream = bodyStream,
                             minTimeSeconds = minTime,
                             maxTimeSeconds = maxTime,
-                            maxChannels = 200
+                            maxChannels = 3000
                         )
                         if (parsed.programs.isNotEmpty()) {
                             cachedXmlTvResult = parsed
@@ -65,11 +65,76 @@ class SportsRepositoryImpl : SportsRepository {
         }
     }
 
-    private fun getIsoDate(dayOffset: Int): String {
-        val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Europe/Madrid")).apply {
-            add(java.util.Calendar.DAY_OF_YEAR, dayOffset)
+    private fun normalizeChannelName(name: String): String {
+        return name.lowercase()
+            .replace("movistar+", "m+")
+            .replace("movistar plus", "m+")
+            .replace("movistar", "m")
+            .replace("laliga", "laliga")
+            .replace("la liga", "laliga")
+            .replace("liga de campeones", "ligadecampeones")
+            .replace("liga campeones", "ligadecampeones")
+            .replace("hd", "")
+            .replace("fhd", "")
+            .replace("4k", "")
+            .replace("sd", "")
+            .replace("es|", "")
+            .replace("spain|", "")
+            .replace("es:", "")
+            .replace("spain:", "")
+            .replace("[^a-z0-9]".toRegex(), "")
+    }
+
+    private fun findMatchingChannel(canalName: String, liveChannels: List<LiveChannel>): LiveChannel? {
+        if (canalName.isBlank() || liveChannels.isEmpty()) return null
+        val normCanal = normalizeChannelName(canalName)
+        if (normCanal.isBlank()) return null
+
+        val exact = liveChannels.firstOrNull { normalizeChannelName(it.name) == normCanal }
+        if (exact != null) return exact
+
+        val contains = liveChannels.firstOrNull { ch ->
+            val normCh = normalizeChannelName(ch.name)
+            normCh.contains(normCanal) || normCanal.contains(normCh)
         }
-        return java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(cal.time)
+        if (contains != null) return contains
+
+        val canalTokens = canalName.lowercase().split(" ", "-", "_", ".").filter { it.length > 1 && it != "hd" && it != "fhd" && it != "es" }
+        if (canalTokens.isNotEmpty()) {
+            val tokenMatch = liveChannels.firstOrNull { ch ->
+                val chLower = ch.name.lowercase()
+                canalTokens.all { token -> chLower.contains(token) }
+            }
+            if (tokenMatch != null) return tokenMatch
+        }
+
+        return null
+    }
+
+    private fun fixMojibake(text: String): String {
+        if (text.isBlank()) return text
+        var clean = text
+            .replace("Ã¡", "á")
+            .replace("Ã©", "é")
+            .replace("Ã­", "í")
+            .replace("Ã³", "ó")
+            .replace("Ãº", "ú")
+            .replace("Ã±", "ñ")
+            .replace("Ã\u0081", "Á")
+            .replace("Ã\u0089", "É")
+            .replace("Ã\u008D", "Í")
+            .replace("Ã\u0093", "Ó")
+            .replace("Ã\u009A", "Ú")
+            .replace("Ã\u0091", "Ñ")
+
+        try {
+            if (clean.contains("Ã")) {
+                val bytes = clean.toByteArray(Charsets.ISO_8859_1)
+                clean = String(bytes, Charsets.UTF_8)
+            }
+        } catch (_: Exception) {}
+
+        return clean.trim()
     }
 
     private suspend fun fetchSportsTxtGuide(liveChannels: List<LiveChannel>): List<SportsEvent> = withContext(Dispatchers.IO) {
@@ -84,74 +149,164 @@ class SportsRepositoryImpl : SportsRepository {
             val request = Request.Builder()
                 .url("http://84.235.239.152/prog/prog.txt?t=${System.currentTimeMillis()}")
                 .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .header("Accept", "text/plain, text/html, */*")
                 .header("Cache-Control", "no-cache, no-store")
                 .build()
 
-            val todayIso = getIsoDate(0)
-            val tomorrowIso = getIsoDate(1)
-            val pasadoIso = getIsoDate(2)
+            val calToday = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Europe/Madrid"))
+            val sdfIso = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+            val todayIso = sdfIso.format(calToday.time)
+
+            val calTomorrow = (calToday.clone() as java.util.Calendar).apply { add(java.util.Calendar.DAY_OF_YEAR, 1) }
+            val tomorrowIso = sdfIso.format(calTomorrow.time)
+
+            val calPasado = (calToday.clone() as java.util.Calendar).apply { add(java.util.Calendar.DAY_OF_YEAR, 2) }
+            val pasadoIso = sdfIso.format(calPasado.time)
 
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@use
-                val text = response.body.string()
+                val rawBytes = response.body.bytes()
+                val text = try {
+                    String(rawBytes, Charsets.UTF_8)
+                } catch (_: Exception) {
+                    String(rawBytes, Charsets.ISO_8859_1)
+                }
+
                 val lines = text.split(Regex("""\r?\n"""))
 
+                var currentFechaIso: String? = null
+                val fechaList = mutableListOf<String>()
                 var idCounter = 1
+
+                val dateRegex = Regex("""(?i)^\s*FECHA:\s*(\d{4}-\d{2}-\d{2})""")
+                val eventLineRegex = Regex("""^\[(\d{1,2}:\d{2})\]\s*\[([^]]+)\]\s*(.+?)\s*\|\s*(.+)$""")
+
                 for (line in lines) {
                     val trimmed = line.trim()
-                    if (trimmed.isBlank() || !trimmed.contains("|") || trimmed.startsWith("FECHA|", ignoreCase = true)) continue
+                    if (trimmed.isBlank() || trimmed.startsWith("=") || trimmed.startsWith("#") || trimmed.startsWith("//")) {
+                        val dateMatch = dateRegex.find(trimmed)
+                        if (dateMatch != null) {
+                            currentFechaIso = dateMatch.groupValues[1]
+                            if (!fechaList.contains(currentFechaIso)) {
+                                fechaList.add(currentFechaIso)
+                            }
+                        }
+                        continue
+                    }
 
-                    val parts = trimmed.split("|")
-                    if (parts.size < 5) continue
+                    val dateMatch = dateRegex.find(trimmed)
+                    if (dateMatch != null) {
+                        currentFechaIso = dateMatch.groupValues[1]
+                        if (!fechaList.contains(currentFechaIso)) {
+                            fechaList.add(currentFechaIso)
+                        }
+                        continue
+                    }
 
-                    val fecha = parts[0].trim()
-                    val hora = parts[1].trim()
-                    val deporte = parts[2].trim().ifBlank { "Deportes" }
-                    val rawEvento = parts[3].trim()
-                    val canal = parts[4].trim()
+                    val match = eventLineRegex.find(trimmed)
+                    if (match != null) {
+                        val hora = match.groupValues[1].trim()
+                        val deporte = fixMojibake(match.groupValues[2].trim()).ifBlank { "Deportes" }
+                        val rawEvento = fixMojibake(match.groupValues[3].trim())
+                        val canal = fixMojibake(match.groupValues[4].trim())
 
-                    if (rawEvento.isBlank()) continue
+                        val dateTab = if (currentFechaIso != null) {
+                            when (currentFechaIso) {
+                                todayIso -> "Hoy"
+                                tomorrowIso -> "Mañana"
+                                pasadoIso -> "Pasado Mañana"
+                                else -> {
+                                    val idx = fechaList.indexOf(currentFechaIso)
+                                    when (idx) {
+                                        0 -> "Hoy"
+                                        1 -> "Mañana"
+                                        2 -> "Pasado Mañana"
+                                        else -> if (currentFechaIso < todayIso) "Hoy" else "Pasado Mañana"
+                                    }
+                                }
+                            }
+                        } else {
+                            "Hoy"
+                        }
 
-                    val dateTab = when (fecha) {
-                        todayIso -> "Hoy"
-                        tomorrowIso -> "Mañana"
-                        pasadoIso -> "Pasado Mañana"
-                        else -> {
-                            if (fecha < todayIso) "Hoy" else "Pasado Mañana"
+                        val competitionAndTitle = if (rawEvento.contains(":")) {
+                            val splitCol = rawEvento.split(":", limit = 2)
+                            Pair(splitCol[0].trim(), splitCol[1].trim())
+                        } else {
+                            Pair(deporte.uppercase(), rawEvento)
+                        }
+
+                        val competition = competitionAndTitle.first
+                        val title = competitionAndTitle.second
+
+                        val matchedChannel = findMatchingChannel(canal, liveChannels)
+
+                        events.add(
+                            SportsEvent(
+                                id = "prog_${currentFechaIso ?: "today"}_$idCounter",
+                                title = title,
+                                competition = competition,
+                                sportCategory = deporte,
+                                dateTab = dateTab,
+                                dateTimeDisplay = hora,
+                                channelName = canal,
+                                channelId = matchedChannel?.id,
+                                streamUrl = matchedChannel?.streamUrl ?: "",
+                                iconUrl = matchedChannel?.iconUrl
+                            )
+                        )
+                        idCounter++
+                    } else if (trimmed.contains("|")) {
+                        val parts = trimmed.split("|")
+                        if (parts.size >= 4) {
+                            val hora = parts[0].replace("[", "").replace("]", "").trim()
+                            val deporte = fixMojibake(parts[1].replace("[", "").replace("]", "").trim()).ifBlank { "Deportes" }
+                            val rawEvento = fixMojibake(parts[2].trim())
+                            val canal = fixMojibake(parts[3].trim())
+
+                            val dateTab = if (currentFechaIso != null) {
+                                when (currentFechaIso) {
+                                    todayIso -> "Hoy"
+                                    tomorrowIso -> "Mañana"
+                                    pasadoIso -> "Pasado Mañana"
+                                    else -> {
+                                        val idx = fechaList.indexOf(currentFechaIso)
+                                        when (idx) {
+                                            0 -> "Hoy"
+                                            1 -> "Mañana"
+                                            2 -> "Pasado Mañana"
+                                            else -> "Pasado Mañana"
+                                        }
+                                    }
+                                }
+                            } else "Hoy"
+
+                            val competitionAndTitle = if (rawEvento.contains(":")) {
+                                val splitCol = rawEvento.split(":", limit = 2)
+                                Pair(splitCol[0].trim(), splitCol[1].trim())
+                            } else {
+                                Pair(deporte.uppercase(), rawEvento)
+                            }
+
+                            val matchedChannel = findMatchingChannel(canal, liveChannels)
+
+                            events.add(
+                                SportsEvent(
+                                    id = "prog_${currentFechaIso ?: "today"}_$idCounter",
+                                    title = competitionAndTitle.second,
+                                    competition = competitionAndTitle.first,
+                                    sportCategory = deporte,
+                                    dateTab = dateTab,
+                                    dateTimeDisplay = hora,
+                                    channelName = canal,
+                                    channelId = matchedChannel?.id,
+                                    streamUrl = matchedChannel?.streamUrl ?: "",
+                                    iconUrl = matchedChannel?.iconUrl
+                                )
+                            )
+                            idCounter++
                         }
                     }
-
-                    val competitionAndTitle = if (rawEvento.contains(":")) {
-                        val splitCol = rawEvento.split(":", limit = 2)
-                        Pair(splitCol[0].trim(), splitCol[1].trim())
-                    } else {
-                        Pair("DEPORTES", rawEvento)
-                    }
-
-                    val competition = competitionAndTitle.first
-                    val title = competitionAndTitle.second
-
-                    val matchedChannel = liveChannels.firstOrNull { ch ->
-                        val cleanCh = ch.name.lowercase().replace(" ", "")
-                        val cleanCanal = canal.lowercase().replace(" ", "")
-                        cleanCh.contains(cleanCanal) || cleanCanal.contains(cleanCh)
-                    }
-
-                    events.add(
-                        SportsEvent(
-                            id = "prog_${fecha}_$idCounter",
-                            title = title,
-                            competition = competition,
-                            sportCategory = deporte,
-                            dateTab = dateTab,
-                            dateTimeDisplay = hora,
-                            channelName = canal,
-                            channelId = matchedChannel?.id,
-                            streamUrl = matchedChannel?.streamUrl ?: "",
-                            iconUrl = matchedChannel?.iconUrl
-                        )
-                    )
-                    idCounter++
                 }
             }
         } catch (e: Exception) {

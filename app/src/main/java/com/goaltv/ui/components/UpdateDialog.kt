@@ -178,3 +178,87 @@ fun UpdateDialog(
         dismissButton = null
     )
 }
+
+@Composable
+fun CurrentVersionDialog(
+    versionName: String,
+    changelog: String,
+    onDismiss: () -> Unit
+) {
+    val cerrarFocusRequester = remember { FocusRequester() }
+
+    val cleanChangelog = remember(changelog, versionName) {
+        changelog
+            .replace(Regex("""(?i)^\s*Novedades\s+en\s+GoalTV\s+v[0-9.]+:?\s*"""), "")
+            .trim()
+    }
+
+    LaunchedEffect(Unit) {
+        try {
+            cerrarFocusRequester.requestFocus()
+        } catch (_: Exception) {}
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        shape = RoundedCornerShape(18.dp),
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.SystemUpdate,
+                    contentDescription = null,
+                    tint = OrangePrimary,
+                    modifier = Modifier.size(26.dp)
+                )
+                Text(
+                    text = "GoalTV v$versionName",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+            }
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Novedades en GoalTV v$versionName:",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 280.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = cleanChangelog,
+                        color = TextMuted,
+                        fontSize = 13.sp,
+                        lineHeight = 20.sp
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(cerrarFocusRequester),
+                colors = ButtonDefaults.buttonColors(containerColor = OrangePrimary),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("CERRAR", fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        },
+        dismissButton = null
+    )
+}

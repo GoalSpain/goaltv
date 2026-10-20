@@ -2,5 +2,5 @@
   "versionCode": 5,
   "versionName": "1.5",
   "download_url": "https://github.com/GoalSpain/goaltv/releases/download/v1.5/goaltv.apk",
-  "changelog": "• GoalTV v1.5 Versión Oficial\n• Ocultación de prefijos ES, ES-, (ES) en todos los canales\n• Coincidencia estricta y aislada de EPG por canal\n• Optimización de imágenes y rendimiento en Android TV"
+  "changelog": "Novedades en GoalTV v1.5:\n\n⚽ Programación Deportiva Corregida y Mejorada: Integración de la guía con vista de 3 días.\n\n🧼 Mejorada Limpieza de Nombres de Canales\n\n🎯 Mejora en la guía EPG propia de los canales"
 }

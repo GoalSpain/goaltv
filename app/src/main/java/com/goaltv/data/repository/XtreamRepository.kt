@@ -37,6 +37,24 @@ interface XtreamRepository {
     fun buildLiveStreamUrl(serverUrl: String, username: String, password: String, streamId: String, extension: String = "ts"): String
     fun buildVodStreamUrl(serverUrl: String, username: String, password: String, streamId: String, extension: String = "mp4"): String
     fun buildSeriesStreamUrl(serverUrl: String, username: String, password: String, episodeId: String, extension: String = "mp4"): String
+    fun buildCatchupStreamUrl(serverUrl: String, username: String, password: String, streamId: String, startTimestampSec: Long, durationMinutes: Int, extension: String = "ts"): String
+}
+
+object ServerCluster {
+    val FALLBACK_SERVERS = listOf(
+        "http://zeta.proxy-pass.xyz:80",
+        "http://gamma.proxy-pass.xyz:80",
+        "http://epsilon.proxy-pass.xyz:80",
+        "http://delta.proxy-pass.xyz:80",
+        "http://iota.proxy-pass.xyz:80",
+        "http://kappa.proxy-pass.xyz:80",
+        "http://eta.proxy-pass.xyz:80",
+        "http://beta.proxy-pass.xyz:80",
+        "http://theta.proxy-pass.xyz:80",
+        "http://alpha.proxy-pass.xyz:80"
+    )
+
+    var activeWorkingServerUrl: String = "http://zeta.proxy-pass.xyz:80"
 }
 
 class XtreamRepositoryImpl(
@@ -53,6 +71,33 @@ class XtreamRepositoryImpl(
         fun createDefaultService(): XtreamCodesService {
             return com.goaltv.data.network.NetworkModule.createXtreamCodesService()
         }
+    }
+
+    private suspend fun <T> executeWithFailover(
+        serverUrl: String,
+        block: suspend (String) -> Result<T>
+    ): Result<T> {
+        val candidateServers = mutableListOf<String>()
+        if (serverUrl.isNotBlank()) {
+            candidateServers.add(serverUrl)
+        }
+        if (ServerCluster.activeWorkingServerUrl.isNotBlank() && !candidateServers.contains(ServerCluster.activeWorkingServerUrl)) {
+            candidateServers.add(ServerCluster.activeWorkingServerUrl)
+        }
+        val fallbacks = ServerCluster.FALLBACK_SERVERS.filter { !candidateServers.contains(it) }.take(2)
+        candidateServers.addAll(fallbacks)
+
+        var lastError: Throwable? = null
+        for (candidate in candidateServers) {
+            val res = block(candidate)
+            if (res.isSuccess) {
+                ServerCluster.activeWorkingServerUrl = candidate
+                return res
+            } else {
+                lastError = res.exceptionOrNull()
+            }
+        }
+        return Result.failure(lastError ?: Exception("Error de conexion con los servidores IPTV"))
     }
 
     private fun normalizePlayerApiUrl(serverUrl: String): String {
@@ -87,9 +132,9 @@ class XtreamRepositoryImpl(
         serverUrl: String,
         username: String,
         password: String
-    ): Result<AuthResponse> = withContext(Dispatchers.IO) {
+    ): Result<AuthResponse> = executeWithFailover(serverUrl) { targetUrl ->
         runCatching {
-            val endpoint = normalizePlayerApiUrl(serverUrl)
+            val endpoint = normalizePlayerApiUrl(targetUrl)
             val response = service.authenticate(endpoint, username, password)
 
             if (!response.isSuccessful) {
@@ -172,10 +217,13 @@ class XtreamRepositoryImpl(
         serverUrl: String,
         username: String,
         password: String
-    ): Result<List<Category>> = withContext(Dispatchers.IO) {
+    ): Result<List<Category>> = executeWithFailover(serverUrl) { targetUrl ->
         runCatching {
-            val endpoint = normalizePlayerApiUrl(serverUrl)
+            val endpoint = normalizePlayerApiUrl(targetUrl)
             val response = service.getLiveCategories(endpoint, username, password)
+            if (!response.isSuccessful) {
+                throw Exception("Fallo de conexion con el servidor (HTTP ${response.code()})")
+            }
             val list = response.body() ?: emptyList()
             list.mapNotNull { dto ->
                 val id = dto.categoryId ?: return@mapNotNull null
@@ -189,17 +237,22 @@ class XtreamRepositoryImpl(
         username: String,
         password: String,
         categoryId: String?
-    ): Result<List<LiveChannel>> = withContext(Dispatchers.IO) {
+    ): Result<List<LiveChannel>> = executeWithFailover(serverUrl) { targetUrl ->
         runCatching {
-            val endpoint = normalizePlayerApiUrl(serverUrl)
+            val endpoint = normalizePlayerApiUrl(targetUrl)
             val response = service.getLiveStreams(endpoint, username, password, categoryId = categoryId)
+            if (!response.isSuccessful) {
+                throw Exception("Fallo de conexion con el servidor (HTTP ${response.code()})")
+            }
             val list = response.body() ?: emptyList()
-            val baseUrl = formatBaseServerUrl(serverUrl)
+            val baseUrl = formatBaseServerUrl(targetUrl)
 
             list.mapNotNull { dto ->
                 val rawId = safeToString(dto.streamId)
                 if (rawId.isBlank()) return@mapNotNull null
                 val streamUrl = buildLiveStreamUrl(baseUrl, username, password, rawId, "ts")
+                val hasCatchup = safeToInt(dto.tvArchive) == 1 || safeToString(dto.tvArchive) == "1" || dto.tvArchive == true
+                val catchupDays = safeToInt(dto.tvArchiveDuration) ?: 1
 
                 LiveChannel(
                     id = rawId,
@@ -209,7 +262,9 @@ class XtreamRepositoryImpl(
                     categoryId = dto.categoryId ?: "0",
                     epgId = dto.epgChannelId,
                     streamType = dto.streamType ?: "live",
-                    channelNumber = dto.num
+                    channelNumber = dto.num,
+                    hasCatchup = hasCatchup,
+                    catchupDays = catchupDays
                 )
             }
         }
@@ -219,10 +274,13 @@ class XtreamRepositoryImpl(
         serverUrl: String,
         username: String,
         password: String
-    ): Result<List<Category>> = withContext(Dispatchers.IO) {
+    ): Result<List<Category>> = executeWithFailover(serverUrl) { targetUrl ->
         runCatching {
-            val endpoint = normalizePlayerApiUrl(serverUrl)
+            val endpoint = normalizePlayerApiUrl(targetUrl)
             val response = service.getVodCategories(endpoint, username, password)
+            if (!response.isSuccessful) {
+                throw Exception("Fallo de conexion con el servidor (HTTP ${response.code()})")
+            }
             val list = response.body() ?: emptyList()
             list.mapNotNull { dto ->
                 val id = dto.categoryId ?: return@mapNotNull null
@@ -247,12 +305,15 @@ class XtreamRepositoryImpl(
         username: String,
         password: String,
         categoryId: String?
-    ): Result<List<VodMovie>> = withContext(Dispatchers.IO) {
+    ): Result<List<VodMovie>> = executeWithFailover(serverUrl) { targetUrl ->
         runCatching {
-            val endpoint = normalizePlayerApiUrl(serverUrl)
+            val endpoint = normalizePlayerApiUrl(targetUrl)
             val response = service.getVodStreams(endpoint, username, password, categoryId = categoryId)
+            if (!response.isSuccessful) {
+                throw Exception("Fallo de conexion con el servidor (HTTP ${response.code()})")
+            }
             val list = response.body() ?: emptyList()
-            val baseUrl = formatBaseServerUrl(serverUrl)
+            val baseUrl = formatBaseServerUrl(targetUrl)
 
             list.mapNotNull { dto ->
                 val rawId = safeToString(dto.streamId)
@@ -278,10 +339,13 @@ class XtreamRepositoryImpl(
         serverUrl: String,
         username: String,
         password: String
-    ): Result<List<Category>> = withContext(Dispatchers.IO) {
+    ): Result<List<Category>> = executeWithFailover(serverUrl) { targetUrl ->
         runCatching {
-            val endpoint = normalizePlayerApiUrl(serverUrl)
+            val endpoint = normalizePlayerApiUrl(targetUrl)
             val response = service.getSeriesCategories(endpoint, username, password)
+            if (!response.isSuccessful) {
+                throw Exception("Fallo de conexion con el servidor (HTTP ${response.code()})")
+            }
             val list = response.body() ?: emptyList()
             list.mapNotNull { dto ->
                 val id = dto.categoryId ?: return@mapNotNull null
@@ -295,12 +359,15 @@ class XtreamRepositoryImpl(
         username: String,
         password: String,
         categoryId: String?
-    ): Result<List<Series>> = withContext(Dispatchers.IO) {
+    ): Result<List<Series>> = executeWithFailover(serverUrl) { targetUrl ->
         runCatching {
-            val endpoint = normalizePlayerApiUrl(serverUrl)
+            val endpoint = normalizePlayerApiUrl(targetUrl)
             val response = service.getSeries(endpoint, username, password, categoryId = categoryId)
+            if (!response.isSuccessful) {
+                throw Exception("Fallo de conexion con el servidor (HTTP ${response.code()})")
+            }
             val list = response.body() ?: emptyList()
-            val baseUrl = formatBaseServerUrl(serverUrl)
+            val baseUrl = formatBaseServerUrl(targetUrl)
 
             list.mapNotNull { dto ->
                 val rawId = safeToString(dto.seriesId)
@@ -323,13 +390,27 @@ class XtreamRepositoryImpl(
         username: String,
         password: String,
         seriesId: String
-    ): Result<List<Episode>> = withContext(Dispatchers.IO) {
+    ): Result<List<Episode>> = executeWithFailover(serverUrl) { targetUrl ->
         runCatching {
-            val endpoint = normalizePlayerApiUrl(serverUrl)
+            val endpoint = normalizePlayerApiUrl(targetUrl)
             val response = service.getSeriesInfo(endpoint, username, password, seriesId = seriesId)
+            if (!response.isSuccessful) {
+                throw Exception("Fallo de conexion con el servidor (HTTP ${response.code()})")
+            }
             val body = response.body() ?: return@runCatching emptyList()
-            val baseUrl = formatBaseServerUrl(serverUrl)
+            val baseUrl = formatBaseServerUrl(targetUrl)
             val resultEpisodes = mutableListOf<Episode>()
+            val resultSeasons = mutableListOf<SeasonInfo>()
+
+            body.seasons?.forEach { dto ->
+                resultSeasons.add(
+                    SeasonInfo(
+                        seasonNumber = dto.seasonNumber ?: 1,
+                        name = dto.name ?: "Season ${dto.seasonNumber ?: 1}",
+                        coverUrl = dto.cover
+                    )
+                )
+            }
 
             body.episodes?.forEach { (_, epList) ->
                 epList.forEach { dto ->
@@ -369,10 +450,13 @@ class XtreamRepositoryImpl(
         password: String,
         streamId: String,
         limit: Int
-    ): Result<List<EpgProgram>> = withContext(Dispatchers.IO) {
+    ): Result<List<EpgProgram>> = executeWithFailover(serverUrl) { targetUrl ->
         runCatching {
-            val endpoint = normalizePlayerApiUrl(serverUrl)
+            val endpoint = normalizePlayerApiUrl(targetUrl)
             val response = service.getShortEpg(endpoint, username, password, streamId = streamId, limit = limit)
+            if (!response.isSuccessful) {
+                throw Exception("Fallo de conexion con el servidor (HTTP ${response.code()})")
+            }
             val listings = response.body()?.epgListings ?: emptyList()
 
             listings.mapNotNull { dto ->
@@ -398,7 +482,8 @@ class XtreamRepositoryImpl(
         streamId: String,
         extension: String
     ): String {
-        val base = formatBaseServerUrl(serverUrl)
+        val target = ServerCluster.activeWorkingServerUrl.ifBlank { serverUrl }
+        val base = formatBaseServerUrl(target)
         if (extension.isBlank()) {
             return "$base/live/$username/$password/$streamId"
         }
@@ -413,7 +498,8 @@ class XtreamRepositoryImpl(
         streamId: String,
         extension: String
     ): String {
-        val base = formatBaseServerUrl(serverUrl)
+        val target = ServerCluster.activeWorkingServerUrl.ifBlank { serverUrl }
+        val base = formatBaseServerUrl(target)
         if (extension.isBlank()) {
             return "$base/movie/$username/$password/$streamId"
         }
@@ -428,12 +514,31 @@ class XtreamRepositoryImpl(
         episodeId: String,
         extension: String
     ): String {
-        val base = formatBaseServerUrl(serverUrl)
+        val target = ServerCluster.activeWorkingServerUrl.ifBlank { serverUrl }
+        val base = formatBaseServerUrl(target)
         if (extension.isBlank()) {
             return "$base/series/$username/$password/$episodeId"
         }
         val ext = extension.removePrefix(".")
         return "$base/series/$username/$password/$episodeId.$ext"
+    }
+
+    override fun buildCatchupStreamUrl(
+        serverUrl: String,
+        username: String,
+        password: String,
+        streamId: String,
+        startTimestampSec: Long,
+        durationMinutes: Int,
+        extension: String
+    ): String {
+        val target = ServerCluster.activeWorkingServerUrl.ifBlank { serverUrl }
+        val base = formatBaseServerUrl(target)
+        val ext = extension.removePrefix(".")
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd:HH-mm", java.util.Locale.US)
+        val startFormatted = sdf.format(java.util.Date(startTimestampSec * 1000L))
+        val dur = if (durationMinutes > 0) durationMinutes else 60
+        return "$base/timeshift/$username/$password/$dur/$startFormatted/$streamId.$ext"
     }
 
     private fun safeToString(value: Any?): String {
@@ -474,16 +579,17 @@ class XtreamRepositoryImpl(
 
     private fun safeDecodeText(text: String?): String? {
         if (text.isNullOrBlank()) return text
-        if (text.contains(" ") || text.contains("\n") || text.contains("\r")) return text
+        val clean = text.trim()
+        if (clean.contains(" ") || clean.contains("\n") || clean.contains("\r")) return text
         return try {
-            val bytes = Base64.decode(text, Base64.DEFAULT)
-            val decoded = String(bytes, Charsets.UTF_8)
-            if (decoded.all { it.code in 32..126 || it == '\n' || it == '\r' || it == '\t' }) {
+            val bytes = Base64.decode(clean, Base64.DEFAULT)
+            val decoded = String(bytes, Charsets.UTF_8).trim()
+            if (decoded.isNotBlank() && decoded.none { it.isISOControl() && it != '\n' && it != '\r' && it != '\t' }) {
                 decoded
             } else {
                 text
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             text
         }
     }

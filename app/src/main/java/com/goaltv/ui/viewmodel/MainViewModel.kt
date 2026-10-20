@@ -30,7 +30,8 @@ enum class AppScreen {
     EPG,
     FAVORITES,
     SETTINGS,
-    SPORTS
+    SPORTS,
+    CATCH_UP
 }
 
 data class PlaybackTarget(

@@ -23,6 +23,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -206,6 +207,15 @@ fun SportsScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            val selectedDateDisplay = remember(uiState.selectedDateTab, todayDateStr, tomorrowFullDate, pasadoFullDate) {
+                when {
+                    uiState.selectedDateTab.equals("Hoy", ignoreCase = true) -> todayDateStr
+                    uiState.selectedDateTab.equals("Mañana", ignoreCase = true) -> tomorrowFullDate
+                    uiState.selectedDateTab.equals("Pasado Mañana", ignoreCase = true) -> pasadoFullDate
+                    else -> uiState.selectedDateTab
+                }
+            }
+
             // EVENTS LIST (Continuous Vertical Scroll)
             if (uiState.isLoading) {
                 Box(
@@ -232,7 +242,7 @@ fun SportsScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "No hay eventos deportivos disponibles para '${uiState.selectedDateTab}'",
+                            text = "No hay eventos deportivos para $selectedDateDisplay",
                             color = TextMuted,
                             fontSize = 13.sp
                         )
@@ -265,7 +275,7 @@ fun SportsScreen(
                     contentPadding = PaddingValues(bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(uiState.filteredEvents, key = { it.id }) { event ->
+                    itemsIndexed(uiState.filteredEvents, key = { idx, ev -> "${ev.id}_$idx" }) { _, event ->
                         SportsEventCard(
                             event = event,
                             isTodayTab = uiState.selectedDateTab.equals("Hoy", ignoreCase = true)

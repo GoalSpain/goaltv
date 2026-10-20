@@ -151,9 +151,14 @@ fun SeriesDetailDialog(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
 
-                        val seasonsList = if (series.seasons.isNotEmpty()) series.seasons.map { it.seasonNumber } else listOf(1)
+                        val availableSeasons = if (series.seasons.isNotEmpty()) {
+                            series.seasons.map { it.seasonNumber }.distinct().sorted()
+                        } else {
+                            episodes.map { it.seasonNum }.distinct().sorted()
+                        }
+                        
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(seasonsList) { seasonNum ->
+                            items(availableSeasons) { seasonNum ->
                                 val isSelected = seasonNum == selectedSeasonNum
                                 FilterChip(
                                     selected = isSelected,

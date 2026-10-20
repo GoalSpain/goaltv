@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -177,7 +178,7 @@ fun ChannelDrawer(
                             )
                         }
 
-                        items(categories, key = { it.id }) { cat ->
+                        itemsIndexed(categories, key = { idx, cat -> "${cat.id}_$idx" }) { _, cat ->
                             FilterChip(
                                 selected = selectedCategoryId == cat.id,
                                 onClick = { selectedCategoryId = cat.id },
@@ -224,7 +225,7 @@ fun ChannelDrawer(
                             .fillMaxWidth()
                             .weight(1f)
                     ) {
-                        items(filteredChannels, key = { it.id }) { channel ->
+                        itemsIndexed(filteredChannels, key = { idx, ch -> "${ch.id}_$idx" }) { _, channel ->
                             val isCurrent = channel.id == currentChannelId
                             val currentEpg = epgPrograms.firstOrNull { it.isCurrentlyLive }?.title
 

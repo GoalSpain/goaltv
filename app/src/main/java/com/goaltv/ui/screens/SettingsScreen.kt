@@ -1,6 +1,10 @@
 ﻿package com.goaltv.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -266,52 +270,6 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Section: VPN
-        val isVpnActive by com.goaltv.data.network.ProtonVpnManager.isVpnActive.collectAsState()
-        val settingsContext = LocalContext.current
-        val settingsScope = rememberCoroutineScope()
-
-        SettingsCard(
-            title = "VPN",
-            icon = Icons.Rounded.Security
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 12.dp)
-                ) {
-                    Text(
-                        text = if (isVpnActive) "Estado: VPN Conectado" else "Estado: VPN Desconectado",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isVpnActive) StatusSuccess else Color.White
-                    )
-                }
-
-                Switch(
-                    checked = isVpnActive,
-                    onCheckedChange = {
-                        settingsScope.launch {
-                            com.goaltv.data.network.ProtonVpnManager.toggleVpn(settingsContext)
-                        }
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = StatusSuccess,
-                        uncheckedThumbColor = TextMuted,
-                        uncheckedTrackColor = SurfaceDarkCard
-                    )
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
         // Section 5: Gestión y Orden de Categorías
         var showCategoryDialog by remember { mutableStateOf(false) }
 
@@ -467,24 +425,9 @@ fun SettingsScreen(
         var showCurrentVersionDialog by remember { mutableStateOf(false) }
 
         if (showCurrentVersionDialog) {
-            UpdateDialog(
-                updateInfo = UpdateInfo(
-                    isUpdateAvailable = false,
-                    versionCode = 5,
-                    versionName = appVersionName,
-                    apkUrl = "https://github.com/GoalSpain/goaltv/releases/latest/download/goaltv.apk",
-                    changelog = """
-                        • GoalTV v1.5 - Novedades de la Versión:
-
-                        • 🧼 Limpieza de Nombres de Canales: Ocultación de prefijos ES, ES-, (ES), ES (O), ES: en la lista de TV.
-                        • 🎯 Coincidencia Estricta e Independiente de EPG: Mantiene vacía la guía de canales sin EPG propia sin mostrar otros canales.
-                        • 📺 Visualización en Android TV: Sincronización horaria exacta (Europe/Madrid), programa en directo resaltado en ámbar y marco naranja.
-                        • ⚽ Programación Deportiva Diaria: Guía de eventos en vivo con vista de 3 pestañas (HOY, MAÑANA y PASADO MAÑANA) y auto-desplazamiento al directo.
-                        • 🎬 Cine y Series (VOD): Carga optimizada de carátulas e imágenes en alta definición con consulta automática a TMDB.
-                        • 💾 Copia de Seguridad y Restauración: Reemplazo automático al guardar y restauración directa desde la carpeta Descargas.
-                        • 🛡️ Firma de Seguridad V2 y V3: Instalación limpia sin avisos de seguridad.
-                    """.trimIndent()
-                ),
+            com.goaltv.ui.components.CurrentVersionDialog(
+                versionName = appVersionName,
+                changelog = "Novedades en GoalTV v$appVersionName:\n\n⚽ Programación Deportiva Corregida y Mejorada: Integración de la guía con vista de 3 días.\n\n🧼 Mejorada Limpieza de Nombres de Canales\n\n🎯 Mejora en la guía EPG propia de los canales",
                 onDismiss = { showCurrentVersionDialog = false }
             )
         }
@@ -525,6 +468,41 @@ fun SettingsScreen(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = OrangeGlow
+                        )
+                    }
+                }
+
+                val currentDeviceId = remember { com.goaltv.data.network.DeviceAuthManager.getDeviceId(updateContext) }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "ID de Dispositivo:",
+                        fontSize = 12.sp,
+                        color = TextMuted
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF222232))
+                            .border(1.dp, Color(0xFF33334A), RoundedCornerShape(6.dp))
+                            .clickable {
+                                val clipboard = updateContext.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                val clip = ClipData.newPlainText("ID Dispositivo", currentDeviceId)
+                                clipboard?.setPrimaryClip(clip)
+                                Toast.makeText(updateContext, "ID de Dispositivo copiado", Toast.LENGTH_SHORT).show()
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = currentDeviceId,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = OrangePrimary
                         )
                     }
                 }

@@ -23,8 +23,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -225,7 +226,7 @@ fun SeriesScreen(
                     }
                 }
 
-                items(uiState.seriesCategories, key = { it.id }) { cat ->
+                itemsIndexed(uiState.seriesCategories, key = { idx, cat -> "${cat.id}_$idx" }) { _, cat ->
                     val isSelected = uiState.selectedSeriesCategory?.id == cat.id
                     FocusableCard(
                         onClick = { viewModel.selectSeriesCategory(cat) },
@@ -275,7 +276,7 @@ fun SeriesScreen(
                         .fillMaxSize()
                         .focusProperties { up = categoryChipFocusRequester }
                 ) {
-                    itemsIndexed(uiState.seriesList, key = { _, s -> s.id }) { index, series ->
+                    gridItemsIndexed(uiState.seriesList, key = { idx, s -> "${s.id}_$idx" }) { index, series ->
                         SeriesCard(
                             series = series,
                             onClick = { viewModel.selectSeries(series) },
@@ -393,20 +394,16 @@ fun SeriesCard(
                     .padding(6.dp),
                 contentAlignment = Alignment.BottomStart
             ) {
-                Column {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text(
                         text = series.name,
                         color = Color.White,
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "${series.seasons.size.coerceAtLeast(1)} Temporada(s)",
-                        color = OrangeGlow,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium
                     )
                 }
             }

@@ -45,22 +45,31 @@ class VodViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val vodCats = repository.getVodCategories()
+                val targetVodCat = _uiState.value.selectedVodCategory ?: vodCats.firstOrNull()
                 val vodMovies = if (_uiState.value.isMovieFavoritesSelected) {
                     repository.getFavoriteMovies()
+                } else if (targetVodCat != null) {
+                    repository.getVodMovies(targetVodCat.id)
                 } else {
-                    repository.getVodMovies(_uiState.value.selectedVodCategory?.id)
+                    emptyList()
                 }
+
                 val serCats = repository.getSeriesCategories()
+                val targetSerCat = _uiState.value.selectedSeriesCategory ?: serCats.firstOrNull()
                 val series = if (_uiState.value.isSeriesFavoritesSelected) {
                     repository.getFavoriteSeries()
+                } else if (targetSerCat != null) {
+                    repository.getSeriesList(targetSerCat.id)
                 } else {
-                    repository.getSeriesList(_uiState.value.selectedSeriesCategory?.id)
+                    emptyList()
                 }
 
                 _uiState.value = _uiState.value.copy(
                     vodCategories = vodCats,
+                    selectedVodCategory = targetVodCat,
                     vodMovies = vodMovies,
                     seriesCategories = serCats,
+                    selectedSeriesCategory = targetSerCat,
                     seriesList = series,
                     isLoading = false
                 )

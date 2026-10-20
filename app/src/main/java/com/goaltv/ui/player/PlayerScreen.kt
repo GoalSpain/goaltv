@@ -155,7 +155,6 @@ fun PlayerScreen(
         } else {
             try {
                 exoPlayer.stop()
-                exoPlayer.release()
             } catch (_: Exception) {}
             onBackClick()
         }
@@ -190,10 +189,20 @@ fun PlayerScreen(
         fallbackUrls = generateFallbackUrls(currentStreamUrl)
         currentFallbackIndex = 0
         val urlToPlay = fallbackUrls.getOrNull(0) ?: currentStreamUrl
-        exoPlayer.stop()
-        exoPlayer.setMediaItem(MediaItem.fromUri(urlToPlay))
-        exoPlayer.prepare()
-        exoPlayer.play()
+        if (urlToPlay.isNotBlank() && (urlToPlay.startsWith("http://") || urlToPlay.startsWith("https://") || urlToPlay.startsWith("rtmp://") || urlToPlay.startsWith("file://"))) {
+            try {
+                exoPlayer.stop()
+                exoPlayer.setMediaItem(MediaItem.fromUri(urlToPlay))
+                exoPlayer.prepare()
+                exoPlayer.play()
+            } catch (e: Exception) {
+                errorMessage = "Error al abrir la transmisión: ${e.localizedMessage}"
+                isBuffering = false
+            }
+        } else {
+            errorMessage = "URL de transmisión no válida"
+            isBuffering = false
+        }
     }
 
     // Attach ExoPlayer Listener & Lifecycle Management
@@ -215,10 +224,15 @@ fun PlayerScreen(
                     currentFallbackIndex++
                     val nextUrl = fallbackUrls[currentFallbackIndex]
                     isBuffering = true
-                    exoPlayer.stop()
-                    exoPlayer.setMediaItem(MediaItem.fromUri(nextUrl))
-                    exoPlayer.prepare()
-                    exoPlayer.play()
+                    try {
+                        exoPlayer.stop()
+                        exoPlayer.setMediaItem(MediaItem.fromUri(nextUrl))
+                        exoPlayer.prepare()
+                        exoPlayer.play()
+                    } catch (_: Exception) {
+                        errorMessage = error.localizedMessage ?: "Fallo de conexión en la transmisión o formato inválido"
+                        isBuffering = false
+                    }
                 } else {
                     errorMessage = error.localizedMessage ?: "Fallo de conexión en la transmisión o formato inválido"
                     isBuffering = false
@@ -310,18 +324,23 @@ fun PlayerScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
 
         onDispose {
-            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            exoPlayer.removeListener(listener)
-            exoPlayer.release()
+            try {
+                activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                lifecycleOwner.lifecycle.removeObserver(observer)
+                exoPlayer.removeListener(listener)
+                exoPlayer.stop()
+                exoPlayer.release()
+            } catch (_: Exception) {}
         }
     }
 
     // Progress Update Timer
     LaunchedEffect(isPlaying) {
         while (isPlaying) {
-            currentPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
-            durationMs = exoPlayer.duration.coerceAtLeast(0L)
+            try {
+                currentPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+                durationMs = exoPlayer.duration.coerceAtLeast(0L)
+            } catch (_: Exception) {}
             delay(500)
         }
     }
@@ -354,25 +373,14 @@ fun PlayerScreen(
     fun switchChannel(newIndex: Int) {
         if (liveChannels.isEmpty()) return
         val clampedIndex = (newIndex + liveChannels.size) % liveChannels.size
+        val ch = liveChannels.getOrNull(clampedIndex) ?: return
         currentChannelIndex = clampedIndex
-        val ch = liveChannels[clampedIndex]
         currentChannel = ch
         currentStreamTitle = ch.name
         currentStreamSubTitle = "TV EN DIRECTO • Canal ${ch.channelNumber ?: (clampedIndex + 1)}"
         currentStreamLogoUrl = ch.iconUrl
         currentStreamUrl = ch.streamUrl
         toastMessage = "Cambiado a: ${ch.name}"
-
-        try {
-            exoPlayer.stop()
-            exoPlayer.clearMediaItems()
-            exoPlayer.setMediaItem(MediaItem.fromUri(ch.streamUrl))
-            exoPlayer.prepare()
-            exoPlayer.playWhenReady = true
-            exoPlayer.play()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
 
         onChannelChange(ch)
         triggerInteraction()

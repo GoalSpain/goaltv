@@ -19,8 +19,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -208,7 +213,7 @@ fun LiveTvScreen(
                     }
                 }
 
-                items(uiState.categories, key = { it.id }) { category ->
+                itemsIndexed(uiState.categories, key = { idx, cat -> "${cat.id}_$idx" }) { _, category ->
                     val isSelected = uiState.selectedCategory?.id == category.id
                     FocusableCard(
                         onClick = { viewModel.selectCategory(category) },
@@ -290,7 +295,7 @@ fun LiveTvScreen(
                                 .fillMaxSize()
                                 .focusProperties { up = categoryChipFocusRequester }
                         ) {
-                            items(uiState.channels, key = { it.id }) { channel ->
+                            itemsIndexed(uiState.channels, key = { idx, ch -> "${ch.id}_$idx" }) { _, channel ->
                                 val isSelected = uiState.selectedChannel?.id == channel.id
                                 ChannelListItem(
                                     channel = channel,
@@ -408,7 +413,7 @@ fun LiveTvScreen(
                                     verticalArrangement = Arrangement.spacedBy(6.dp),
                                     modifier = Modifier.fillMaxSize()
                                 ) {
-                                    items(uiState.epgPrograms, key = { it.id }) { program ->
+                                    itemsIndexed(uiState.epgPrograms, key = { idx, p -> "${p.id}_$idx" }) { _, program ->
                                         EpgProgramItem(program = program)
                                     }
                                 }
@@ -534,7 +539,26 @@ fun EpgProgramItem(
     program: EpgProgram,
     modifier: Modifier = Modifier
 ) {
-    val isLive = program.isCurrentlyLive || program.isLive
+    var isLive by remember { mutableStateOf(program.isCurrentlyLive) }
+    var currentProgress by remember { mutableStateOf(program.progressPercent) }
+
+    LaunchedEffect(program) {
+        while (true) {
+            val now = System.currentTimeMillis() / 1000L
+            val currentlyLive = now in program.startTimestamp..program.endTimestamp
+            isLive = currentlyLive
+
+            if (currentlyLive) {
+                val total = program.endTimestamp - program.startTimestamp
+                val passed = now - program.startTimestamp
+                currentProgress = (passed.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+            } else {
+                currentProgress = if (now > program.endTimestamp) 1f else 0f
+            }
+            kotlinx.coroutines.delay(10000)
+        }
+    }
+
     val timeFormatter = remember {
         SimpleDateFormat("HH:mm", Locale.US).apply {
             timeZone = TimeZone.getTimeZone("Europe/Madrid")
@@ -545,15 +569,13 @@ fun EpgProgramItem(
 
     FocusableCard(
         onClick = {},
-        modifier = modifier
-            .fillMaxWidth()
-            .then(
-                if (isLive) Modifier.border(1.5.dp, OrangePrimary, RoundedCornerShape(8.dp)) else Modifier
-            ),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         colors = androidx.compose.material3.CardDefaults.cardColors(
             containerColor = if (isLive) Color(0xFF282218) else SurfaceDarkCard
-        )
+        ),
+        focusedBorderColor = if (isLive) OrangePrimary else null,
+        unfocusedBorderColor = if (isLive) OrangePrimary.copy(alpha = 0.5f) else null
     ) {
         Column(
             modifier = Modifier
@@ -621,7 +643,7 @@ fun EpgProgramItem(
             if (isLive) {
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
-                    progress = { program.progressPercent },
+                    progress = { currentProgress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(4.dp)

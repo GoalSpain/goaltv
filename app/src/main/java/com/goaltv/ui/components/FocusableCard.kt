@@ -18,12 +18,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.goaltv.ui.theme.OrangeGlow
 import com.goaltv.ui.theme.OrangePrimary
 import com.goaltv.ui.theme.SurfaceDarkCard
 
@@ -35,6 +33,7 @@ fun FocusableCard(
     colors: CardColors = CardDefaults.cardColors(containerColor = SurfaceDarkCard),
     elevation: Dp = 4.dp,
     focusedBorderColor: Color? = null,
+    unfocusedBorderColor: Color? = null,
     enableScale: Boolean = true,
     content: @Composable BoxScope.() -> Unit
 ) {
@@ -48,21 +47,20 @@ fun FocusableCard(
     )
 
     val shadowElevation by animateFloatAsState(
-        targetValue = if (isFocused) 16f else elevation.value,
+        targetValue = if (isFocused) 12f else elevation.value,
         animationSpec = tween(durationMillis = 150),
         label = "card_shadow"
     )
 
     val activeBorderColor = focusedBorderColor ?: OrangePrimary
+    val inactiveBorderColor = unfocusedBorderColor ?: Color(0xFF2E2E40)
 
     Card(
         modifier = modifier
             .scale(scale)
             .shadow(
                 elevation = shadowElevation.dp,
-                shape = shape,
-                ambientColor = if (isFocused) activeBorderColor else Color.Black,
-                spotColor = if (isFocused) activeBorderColor else Color.Black
+                shape = shape
             )
             .clickable(
                 interactionSource = interactionSource,
@@ -77,7 +75,7 @@ fun FocusableCard(
                 color = activeBorderColor
             )
         } else {
-            BorderStroke(1.dp, Color(0xFF2E2E40))
+            BorderStroke(if (unfocusedBorderColor != null) 1.5.dp else 1.dp, inactiveBorderColor)
         }
     ) {
         Box {

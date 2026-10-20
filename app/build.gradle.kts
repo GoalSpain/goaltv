@@ -15,8 +15,8 @@ android {
         applicationId = "com.goaltv"
         minSdk = 24
         targetSdk = 37
-        versionCode = 5
-        versionName = "1.5"
+        versionCode = 6
+        versionName = "1.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -43,14 +43,38 @@ android {
             if (ksFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
         debug {
             val ksFile = rootProject.file("keystore/goaltv_release.jks")
             if (ksFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/*.version",
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
+                "META-INF/licenses/*",
+                "META-INF/AL2.0",
+                "META-INF/LGPL2.1"
+            )
         }
     }
     compileOptions {
@@ -114,6 +138,7 @@ dependencies {
     implementation(libs.okhttp.dnsoverhttps)
     implementation(libs.play.services.location)
     implementation(libs.retrofit)
+    implementation(libs.zxing.core)
     testImplementation(libs.androidx.core)
     testImplementation(libs.androidx.junit)
     testImplementation(libs.junit)
@@ -130,13 +155,15 @@ dependencies {
 }
 
 abstract class CopyApkTask : DefaultTask() {
-    @get:Optional
-    @get:InputFile
-    @get:PathSensitive(PathSensitivity.RELATIVE)
+    @get:Internal
     abstract val inputFile: RegularFileProperty
 
     @get:OutputFile
     abstract val outputFile: RegularFileProperty
+
+    init {
+        outputs.upToDateWhen { false }
+    }
 
     @TaskAction
     fun copy() {
@@ -149,11 +176,13 @@ abstract class CopyApkTask : DefaultTask() {
 }
 
 val copyDebugApk = tasks.register<CopyApkTask>("copyDebugApk") {
-    dependsOn(tasks.matching { it.name == "assembleDebug" })
+    description = "Copies the debug APK to the project root directory"
     inputFile.set(layout.buildDirectory.file("outputs/apk/debug/goaltv.apk"))
     outputFile.set(layout.projectDirectory.file("../goaltv.apk"))
 }
 
-tasks.matching { it.name == "assembleDebug" }.configureEach {
-    finalizedBy(copyDebugApk)
+tasks.configureEach {
+    if (name == "assembleDebug" || name == "packageDebug") {
+        finalizedBy(copyDebugApk)
+    }
 }

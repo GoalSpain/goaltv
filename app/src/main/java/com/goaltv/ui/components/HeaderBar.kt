@@ -19,9 +19,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Security
+import androidx.compose.ui.draw.rotate
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -152,8 +152,35 @@ fun HeaderBar(
                 }
             }
 
-            // ProtonVPN Badge
-            ProtonVpnBadge()
+            // Refresh Button: "Actualizar"
+            FocusableCard(
+                onClick = onReloadClick,
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDarkCard),
+                elevation = 2.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = "Actualizar Lista",
+                        tint = OrangePrimary,
+                        modifier = Modifier
+                            .size(15.dp)
+                            .rotate(rotation)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = "Actualizar",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
 
             // Account Icon Button
             FocusableCard(
@@ -175,55 +202,6 @@ fun HeaderBar(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun ProtonVpnBadge(
-    modifier: Modifier = Modifier
-) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val isVpnActive by com.goaltv.data.network.ProtonVpnManager.isVpnActive.collectAsState()
-    val isConnecting by com.goaltv.data.network.ProtonVpnManager.isConnecting.collectAsState()
-
-    val badgeBg = if (isVpnActive) Color(0xFF0F2E1E) else SurfaceDarkCard
-    val badgeContentColor = if (isVpnActive) StatusSuccess else TextSecondary
-    val statusText = when {
-        isConnecting -> "VPN ⏳"
-        isVpnActive -> "VPN 🛡️ Activo"
-        else -> "VPN"
-    }
-
-    FocusableCard(
-        onClick = {
-            scope.launch {
-                com.goaltv.data.network.ProtonVpnManager.toggleVpn(context)
-            }
-        },
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = badgeBg),
-        elevation = 2.dp,
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            Icon(
-                imageVector = if (isVpnActive) Icons.Rounded.Security else Icons.Rounded.Lock,
-                contentDescription = statusText,
-                tint = badgeContentColor,
-                modifier = Modifier.size(12.dp)
-            )
-            Text(
-                text = statusText,
-                color = badgeContentColor,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold
-            )
         }
     }
 }

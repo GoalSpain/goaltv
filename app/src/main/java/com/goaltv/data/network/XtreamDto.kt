@@ -52,7 +52,9 @@ data class XtreamLiveStreamDto(
     @field:Json(name = "category_id") val categoryId: String? = null,
     @field:Json(name = "stream_type") val streamType: String? = null,
     @field:Json(name = "custom_sid") val customSid: String? = null,
-    @field:Json(name = "direct_source") val directSource: String? = null
+    @field:Json(name = "direct_source") val directSource: String? = null,
+    @field:Json(name = "tv_archive") val tvArchive: Any? = null,
+    @field:Json(name = "tv_archive_duration") val tvArchiveDuration: Any? = null
 )
 
 @JsonClass(generateAdapter = true)

@@ -20,7 +20,7 @@ object NetworkModule {
     val isDohEnabled: StateFlow<Boolean> = _isDohEnabled.asStateFlow()
 
     fun setDohEnabled(enabled: Boolean) {
-        _isDohEnabled.value = false
+        _isDohEnabled.value = enabled
     }
 
     fun getOkHttpClient(dohEnabled: Boolean = false): OkHttpClient {

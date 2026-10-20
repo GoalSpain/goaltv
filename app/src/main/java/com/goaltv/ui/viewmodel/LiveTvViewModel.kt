@@ -37,10 +37,13 @@ class LiveTvViewModel(
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val cats = repository.getLiveCategories()
+                val targetCategory = _uiState.value.selectedCategory ?: cats.firstOrNull()
                 val channels = if (_uiState.value.isFavoritesSelected) {
                     repository.getFavoriteChannels()
+                } else if (targetCategory != null) {
+                    repository.getLiveChannels(targetCategory.id)
                 } else {
-                    repository.getLiveChannels(_uiState.value.selectedCategory?.id)
+                    emptyList()
                 }
                 val currentSelected = _uiState.value.selectedChannel
                 val activeChannel = if (currentSelected != null && channels.any { it.id == currentSelected.id }) {
@@ -54,6 +57,7 @@ class LiveTvViewModel(
 
                 _uiState.value = _uiState.value.copy(
                     categories = cats,
+                    selectedCategory = targetCategory,
                     channels = channels,
                     selectedChannel = activeChannel,
                     epgPrograms = epg,

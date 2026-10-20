@@ -11,7 +11,6 @@ data class EpgProgram(
 ) {
     val isCurrentlyLive: Boolean
         get() {
-            if (isLive) return true
             val now = System.currentTimeMillis() / 1000
             return now in startTimestamp..endTimestamp
         }
