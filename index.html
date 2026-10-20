@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoalTV - Reproductor IPTV con Guía Deportiva y EPG</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            dark: '#0f172a',
+                            card: '#1e293b',
+                            accent: '#22c55e',
+                            purple: '#a855f7',
+                            blue: '#3b82f6'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-brand-dark text-slate-100 font-sans antialiased selection:bg-brand-accent selection:text-slate-900">
+
+    <!-- Header / Hero Section -->
+    <header class="relative overflow-hidden border-b border-slate-800 bg-gradient-to-b from-slate-900 to-brand-dark py-16 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-4xl mx-auto text-center">
+            
+            <!-- Logo -->
+            <div class="mb-6 flex justify-center">
+                <img src="app/src/main/res/drawable/logo2.png" width="140" height="140" alt="GoalTV Logo" class="rounded-full shadow-2xl border-4 border-brand-accent/30 object-cover w-36 h-36" />
+            </div>
+
+            <!-- Title -->
+            <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight text-white mb-4">
+                ⚽ GoalTV <span class="text-brand-accent">- Reproductor IPTV con Guía Deportiva y EPG</span>
+            </h1>
+
+            <!-- Subtitle -->
+            <p class="text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto mb-8 font-medium">
+                Aplicación IPTV de alto rendimiento para Android TV, Fire TV, Teléfonos Móviles y Tablets.
+            </p>
+
+            <!-- Badges -->
+            <div class="flex flex-wrap justify-center gap-3 mb-8">
+                <a href="https://developer.android.com/" target="_blank" rel="noopener noreferrer">
+                    <img src="https://img.shields.io/badge/Platform-Android%20%7C%20Android%20TV-green" alt="Platform" class="inline-block">
+                </a>
+                <a href="https://kotlinlang.org/" target="_blank" rel="noopener noreferrer">
+                    <img src="https://img.shields.io/badge/Language-Kotlin%202.2-blue" alt="Language" class="inline-block">
+                </a>
+                <a href="https://developer.android.com/jetpack/compose" target="_blank" rel="noopener noreferrer">
+                    <img src="https://img.shields.io/badge/UI-Jetpack%20Compose-purple" alt="Compose" class="inline-block">
+                </a>
+            </div>
+
+            <!-- Important Warning Box -->
+            <div class="bg-amber-950/40 border border-amber-500/30 rounded-xl p-4 max-w-xl mx-auto text-amber-200/90 text-sm flex items-center justify-center space-x-3 shadow-lg">
+                <i class="fa-solid fa-triangle-exclamation text-amber-400 text-xl flex-shrink-0"></i>
+                <span class="text-left font-medium"><strong>Aviso Importante:</strong> GoalTV no proporciona listas de reproducción ni ningún otro contenido digital.</span>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
+
+        <!-- Características Principales -->
+        <section>
+            <h2 class="text-3xl font-bold text-white mb-8 border-b border-slate-800 pb-3 flex items-center">
+                <i class="fa-solid fa-star text-brand-accent mr-3"></i> Características Principales
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <!-- Card 1 -->
+                <div class="bg-brand-card rounded-xl p-6 border border-slate-800 hover:border-slate-700 transition shadow-xl">
+                    <div class="text-brand-accent text-2xl mb-4"><i class="fa-solid fa-tv"></i></div>
+                    <h3 class="text-xl font-semibold text-white mb-3">TV en Directo & EPG Sincronizada</h3>
+                    <ul class="space-y-2 text-slate-300 text-sm">
+                        <li class="flex items-start"><i class="fa-solid fa-check text-brand-accent mt-1 mr-2"></i><span><strong>Guía XMLTV Unificada:</strong> Sincronización horaria exacta en formato <code>Europe/Madrid</code>.</span></li>
+                        <li class="flex items-start"><i class="fa-solid fa-check text-brand-accent mt-1 mr-2"></i><span><strong>Indicadores en Tiempo Real:</strong> Resaltado del programa activo con tono cálido, etiqueta <code class="bg-slate-800 px-1.5 py-0.5 rounded text-xs text-brand-accent">EN DIRECTO</code> y barra de progreso.</span></li>
+                        <li class="flex items-start"><i class="fa-solid fa-check text-brand-accent mt-1 mr-2"></i><span><strong>Auto-desplazamiento:</strong> Posiciona automáticamente el cursor en la emisión en directo al seleccionar un canal.</span></li>
+                        <li class="flex items-start"><i class="fa-solid fa-check text-brand-accent mt-1 mr-2"></i><span><strong>Selección al Toque:</strong> Tocar un canal selecciona su guía; tocar un canal seleccionado inicia la reproducción inmediatamente.</span></li>
+                    </ul>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="bg-brand-card rounded-xl p-6 border border-slate-800 hover:border-slate-700 transition shadow-xl">
+                    <div class="text-brand-blue text-2xl mb-4"><i class="fa-solid fa-futbol"></i></div>
+                    <h3 class="text-xl font-semibold text-white mb-3">Programación Deportiva Actualizada</h3>
+                    <ul class="space-y-2 text-slate-300 text-sm">
+                        <li class="flex items-start"><i class="fa-solid fa-check text-brand-blue mt-1 mr-2"></i><span><strong>Guía de Eventos:</strong> Actualizada automáticamente todos los días.</span></li>
+                        <li class="flex items-start"><i class="fa-solid fa-check text-brand-blue mt-1 mr-2"></i><span><strong>Navegación Intuitiva:</strong> Pestañas con fechas reales <code class="bg-slate-800 px-1.5 py-0.5 rounded text-xs text-brand-blue">HOY</code> y <code class="bg-slate-800 px-1.5 py-0.5 rounded text-xs text-brand-blue">MAÑANA</code>.</span></li>
+                        <li class="flex items-start"><i class="fa-solid fa-check text-brand-blue mt-1 mr-2"></i><span><strong>Navegación por Mando D-Pad:</strong> Conmutación rápida entre días con las teclas izquierda/derecha del mando a distancia.</span></li>
+                    </ul>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="bg-brand-card rounded-xl p-6 border border-slate-800 hover:border-slate-700 transition shadow-xl">
+                    <div class="text-brand-purple text-2xl mb-4"><i class="fa-solid fa-film"></i></div>
+                    <h3 class="text-xl font-semibold text-white mb-3">Cine y Series (VOD)</h3>
+                    <ul class="space-y-2 text-slate-300 text-sm">
+                        <li class="flex items-start"><i class="fa-solid fa-check text-brand-purple mt-1 mr-2"></i><span><strong>Portadas del Proveedor:</strong> Carga de carátulas originales del servidor con soporte para rutas relativas.</span></li>
+                        <li class="flex items-start"><i class="fa-solid fa-check text-brand-purple mt-1 mr-2"></i><span><strong>Enriquecimiento TMDB:</strong> Integración con The Movie Database para sinopsis, fechas de estreno y puntuaciones por estrellas.</span></li>
+                        <li class="flex items-start"><i class="fa-solid fa-check text-brand-purple mt-1 mr-2"></i><span><strong>Mosaico Adaptativo:</strong> Rejilla optimizada que se escala automáticamente según el tamaño de la pantalla.</span></li>
+                    </ul>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="bg-brand-card rounded-xl p-6 border border-slate-800 hover:border-slate-700 transition shadow-xl">
+                    <div class="text-amber-400 text-2xl mb-4"><i class="fa-solid fa-floppy-disk"></i></div>
+                    <h3 class="text-xl font-semibold text-white mb-3">Copia de Seguridad y Configuración</h3>
+                    <ul class="space-y-2 text-slate-300 text-sm">
+                        <li class="flex items-start"><i class="fa-solid fa-check text-amber-400 mt-1 mr-2"></i><span><strong>Buscador de Archivos del Sistema:</strong> Exportación e importación de favoritos y categorías en formato JSON (<code class="bg-slate-800 px-1.5 py-0.5 rounded text-xs text-amber-300">goaltv_backup.json</code>).</span></li>
+                        <li class="flex items-start"><i class="fa-solid fa-check text-amber-400 mt-1 mr-2"></i><span><strong>Reordenación de Categorías:</strong> Reorganiza las categorías mediante botones dobles (<code class="bg-slate-800 px-1 py-0.5 rounded text-xs">[ ⏫ ]</code> y <code class="bg-slate-800 px-1 py-0.5 rounded text-xs">[ ⏬ ]</code>) y oculta grupos no deseados.</span></li>
+                    </ul>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Capturas de Pantalla -->
+        <section>
+            <h2 class="text-3xl font-bold text-white mb-8 border-b border-slate-800 pb-3 flex items-center">
+                <i class="fa-solid fa-mobile-screen text-brand-accent mr-3"></i> Capturas de Pantalla e Interfaz
+            </h2>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                <div class="bg-brand-card rounded-xl p-4 border border-slate-800 flex flex-col items-center shadow-lg">
+                    <p class="text-sm font-semibold text-slate-300 mb-3 text-center">Menú Principal</p>
+                    <img src="images/principal.jpg" width="500" alt="principal" class="rounded-lg shadow-md border border-slate-700 object-cover h-64 w-full" />
+                </div>
+
+                <div class="bg-brand-card rounded-xl p-4 border border-slate-800 flex flex-col items-center shadow-lg">
+                    <p class="text-sm font-semibold text-slate-300 mb-3 text-center">Guía EPG en Directo</p>
+                    <img src="images/epg.jpg" width="500" alt="epg" class="rounded-lg shadow-md border border-slate-700 object-cover h-64 w-full" />
+                </div>
+
+                <div class="bg-brand-card rounded-xl p-4 border border-slate-800 flex flex-col items-center shadow-lg">
+                    <p class="text-sm font-semibold text-slate-300 mb-3 text-center">Programación Deportiva Diaria</p>
+                    <img src="images/prog.jpg" width="500" alt="programacion" class="rounded-lg shadow-md border border-slate-700 object-cover h-64 w-full" />
+                </div>
+
+                <div class="bg-brand-card rounded-xl p-4 border border-slate-800 flex flex-col items-center shadow-lg">
+                    <p class="text-sm font-semibold text-slate-300 mb-3 text-center">Gestión de Categorías</p>
+                    <img src="images/gestioncat.jpg" width="500" alt="categorias" class="rounded-lg shadow-md border border-slate-700 object-cover h-64 w-full" />
+                </div>
+
+                <div class="bg-brand-card rounded-xl p-4 border border-slate-800 flex flex-col items-center shadow-lg sm:col-span-2 lg:col-span-2">
+                    <p class="text-sm font-semibold text-slate-300 mb-3 text-center">Ajustes</p>
+                    <img src="images/ajustes.jpg" width="500" alt="ajustes" class="rounded-lg shadow-md border border-slate-700 object-cover h-64 w-full max-w-md" />
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Instalación y Descarga -->
+        <section class="bg-gradient-to-r from-slate-900 via-brand-card to-slate-900 border border-slate-800 rounded-2xl p-8 text-center shadow-2xl">
+            <h2 class="text-2xl sm:text-3xl font-bold text-white mb-4">🚀 Instalación y Descarga</h2>
+            <p class="text-slate-300 max-w-xl mx-auto mb-6 text-sm sm:text-base">
+                Puedes descargar la última versión compilada lista para instalar en tu Smart TV o teléfono móvil desde la sección oficial de Releases:
+            </p>
+            <a href="https://github.com/GoalSpain/goaltv/releases/latest" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-2 bg-brand-accent hover:bg-emerald-600 text-slate-950 font-bold px-8 py-3 rounded-xl transition shadow-lg transform hover:-translate-y-0.5">
+                <i class="fa-solid fa-download"></i>
+                <span>Descargar GoalTV APK (Última Versión)</span>
+            </a>
+        </section>
+
+        <!-- Tecnologías y Arquitectura -->
+        <section>
+            <h2 class="text-3xl font-bold text-white mb-8 border-b border-slate-800 pb-3 flex items-center">
+                <i class="fa-solid fa-code text-brand-blue mr-3"></i> Tecnologías y Arquitectura
+            </h2>
+            <div class="bg-brand-card rounded-xl p-6 border border-slate-800 shadow-xl">
+                <ul class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-slate-300 text-sm">
+                    <li class="flex items-center"><i class="fa-solid fa-angle-right text-brand-accent mr-2"></i><span><strong>Lenguaje:</strong> <a href="https://kotlinlang.org/" target="_blank" class="text-brand-blue hover:underline">Kotlin</a></span></li>
+                    <li class="flex items-center"><i class="fa-solid fa-angle-right text-brand-accent mr-2"></i><span><strong>UI Framework:</strong> <a href="https://developer.android.com/jetpack/compose" target="_blank" class="text-brand-blue hover:underline">Jetpack Compose</a> & Material Design 3</span></li>
+                    <li class="flex items-center"><i class="fa-solid fa-angle-right text-brand-accent mr-2"></i><span><strong>Reproductor de Vídeo:</strong> <a href="https://developer.android.com/guide/topics/media/exoplayer" target="_blank" class="text-brand-blue hover:underline">Jetpack Media3 ExoPlayer</a></span></li>
+                    <li class="flex items-center"><i class="fa-solid fa-angle-right text-brand-accent mr-2"></i><span><strong>Carga de Imágenes:</strong> <a href="https://coil-kt.github.io/coil/" target="_blank" class="text-brand-blue hover:underline">Coil</a> con cliente OkHttp personalizado</span></li>
+                    <li class="flex items-center"><i class="fa-solid fa-angle-right text-brand-accent mr-2"></i><span><strong>Red y API:</strong> Retrofit 2, OkHttp 3 & Moshi</span></li>
+                    <li class="flex items-center"><i class="fa-solid fa-angle-right text-brand-accent mr-2"></i><span><strong>Arquitectura:</strong> MVVM + Repository + Coroutines</span></li>
+                </ul>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-900 mt-20 py-8 text-center text-slate-400 text-sm">
+        <p class="mb-2">Este proyecto está distribuido bajo la licencia pública para uso personal y comunitario.</p>
+        <p class="font-medium text-slate-300">Developed with ❤️ by <span class="text-brand-accent">GoalSpain</span>.</p>
+    </footer>
+
+</body>
+</html>
