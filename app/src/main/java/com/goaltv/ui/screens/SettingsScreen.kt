@@ -427,7 +427,7 @@ fun SettingsScreen(
         if (showCurrentVersionDialog) {
             com.goaltv.ui.components.CurrentVersionDialog(
                 versionName = appVersionName,
-                changelog = "Novedades en GoalTV v$appVersionName:\n\n⚽ Programación Deportiva Corregida y Mejorada: Integración de la guía con vista de 3 días.\n\n🧼 Mejorada Limpieza de Nombres de Canales\n\n🎯 Mejora en la guía EPG propia de los canales",
+                changelog = "Novedades en GoalTV v1.7\n\n🚀 Carga rápida de Canales: Toda la base masiva de datos (canales, VOD y series) se procesa ahora de manera multi-hilo en segundo plano. La aplicación inicia y salta entre las pantallas al instante y sin congelaciones.\n\n📺 Soporte Avanzado para TVs Modestas: Solucionados los problemas de falta de memoria, reinicios y paradas en decodificadores y Smart TVs antiguas.\n\n✨ Mejorada fluidez visual.",
                 onDismiss = { showCurrentVersionDialog = false }
             )
         }
