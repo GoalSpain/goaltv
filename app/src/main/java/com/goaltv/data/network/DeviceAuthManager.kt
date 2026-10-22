@@ -25,25 +25,36 @@ data class DeviceAuthResult(
 
 object DeviceAuthManager {
 
-    private const val API_URL = "http://84.235.239.152/admin/api.php"
-    private const val CONFIGURAR_URL = "http://84.235.239.152/admin/configurar.php"
+    private const val API_URL = "http://84.235.239.152/goaltv/api.php"
+    private const val CONFIGURAR_URL = "http://84.235.239.152/goaltv/configurar.php"
 
     @Volatile
     private var cachedIp: String? = null
 
     @SuppressLint("HardwareIds")
     fun getDeviceId(context: Context): String {
-        return try {
+        val prefs = context.getSharedPreferences("goaltv_device", Context.MODE_PRIVATE)
+        val savedId = prefs.getString("unique_device_id", null)
+        if (!savedId.isNullOrBlank()) {
+            return savedId
+        }
+
+        val generatedId = try {
             val rawId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID) ?: ""
             val cleanHex = rawId.replace("-", "").trim()
             if (cleanHex.length >= 6) {
                 cleanHex.takeLast(6).uppercase()
             } else {
-                ("G" + Math.abs(cleanHex.hashCode()).toString(16)).take(6).uppercase()
+                val randomNum = (100000..999999).random()
+                "G$randomNum"
             }
         } catch (_: Exception) {
-            "G12345"
+            val randomNum = (100000..999999).random()
+            "G$randomNum"
         }
+
+        prefs.edit().putString("unique_device_id", generatedId).apply()
+        return generatedId
     }
 
     fun getLocalIpAddress(): String {
@@ -68,9 +79,11 @@ object DeviceAuthManager {
 
     suspend fun fetchDeviceIp(client: OkHttpClient): String = withContext(Dispatchers.IO) {
         cachedIp?.let { if (it.isNotBlank()) return@withContext it }
+        
+        // 1. Intentar ipify (HTTP para máxima compatibilidad con Smart TVs antiguas Android 7/8 sin TLS moderno)
         try {
             val request = Request.Builder()
-                .url("https://api.ipify.org")
+                .url("http://api.ipify.org")
                 .header("User-Agent", "GoalTV-DeviceAuth")
                 .build()
             client.newCall(request).execute().use { resp ->
@@ -84,6 +97,24 @@ object DeviceAuthManager {
             }
         } catch (_: Exception) {}
 
+        // 2. Intentar amazon aws ip check
+        try {
+            val request = Request.Builder()
+                .url("http://checkip.amazonaws.com/")
+                .header("User-Agent", "GoalTV-DeviceAuth")
+                .build()
+            client.newCall(request).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val ip = resp.body.string().trim()
+                    if (ip.isNotBlank()) {
+                        cachedIp = ip
+                        return@withContext ip
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        // 3. Fallback a IP Local
         val localIp = getLocalIpAddress()
         if (localIp.isNotBlank()) {
             cachedIp = localIp
@@ -97,7 +128,12 @@ object DeviceAuthManager {
         val client = NetworkModule.getOkHttpClient()
         val ip = fetchDeviceIp(client)
 
-        // Registrar en BD que el dispositivo existe
+        // Lanzar una excepción literal si la IP está completamente vacía, para evitar registrar vacío y dejar pillada la TV
+        if (ip.isBlank() || ip.length < 5) {
+            throw java.io.IOException("Sin conectividad IP")
+        }
+
+        // Registrar en BD que el dispositivo existe. Lanzará excepción si no hay internet hacia tu server
         registerDeviceAndIpInDb(client, deviceId, ip)
 
         "$CONFIGURAR_URL?id=$deviceId"
@@ -107,35 +143,35 @@ object DeviceAuthManager {
         val model = "${Build.MANUFACTURER} ${Build.MODEL}"
         val osVersion = Build.VERSION.RELEASE
 
-        try {
-            val formBody = FormBody.Builder()
-                .add("device_id", deviceId)
-                .add("id", deviceId)
-                .add("ip", ip)
-                .add("tipo_dispositivo", "tv")
-                .add("modelo", model)
-                .add("os", osVersion)
-                .add("nombre_app", "goal_tv")
-                .build()
+        val formBody = FormBody.Builder()
+            .add("device_id", deviceId)
+            .add("id", deviceId)
+            .add("ip", ip)
+            .add("tipo_dispositivo", "tv")
+            .add("modelo", model)
+            .add("os", osVersion)
+            .add("nombre_app", "goal_tv")
+            .build()
 
-            val request = Request.Builder()
-                .url("$API_URL?device_id=$deviceId&id=$deviceId&tipo_dispositivo=tv&ip=$ip&t=${System.currentTimeMillis()}")
-                .post(formBody)
-                .header("User-Agent", "GoalTV-DeviceAuth")
-                .header("Accept", "application/json, text/html, text/plain")
-                .header("Cache-Control", "no-cache, no-store")
-                .build()
+        val request = Request.Builder()
+            .url("$API_URL?device_id=$deviceId&id=$deviceId&tipo_dispositivo=tv&ip=$ip&t=${System.currentTimeMillis()}")
+            .post(formBody)
+            .header("User-Agent", "GoalTV-DeviceAuth")
+            .header("Accept", "application/json, text/html, text/plain")
+            .header("Cache-Control", "no-cache, no-store")
+            .build()
 
-            client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    val bodyStr = response.body.string()
-                    val res = parseCredentialsFromResponse(bodyStr, deviceId, ip)
-                    if (res != null && !res.username.isNullOrBlank() && !res.password.isNullOrBlank()) {
-                        return res
-                    }
+        client.newCall(request).execute().use { response ->
+            if (response.isSuccessful) {
+                val bodyStr = response.body.string()
+                val res = parseCredentialsFromResponse(bodyStr, deviceId, ip)
+                if (res != null && !res.username.isNullOrBlank() && !res.password.isNullOrBlank()) {
+                    return res
                 }
+            } else {
+                throw java.io.IOException("Error HTTP ${response.code}")
             }
-        } catch (_: Exception) {}
+        }
 
         return null
     }
@@ -250,6 +286,7 @@ object DeviceAuthManager {
         val ip = fetchDeviceIp(client)
 
         // Registrar en BD y comprobar si ya se recibieron las credenciales temporales
+        // Lanzará una excepción si no hay conexión a internet, lo cual es correcto para reintentar más tarde
         val regResult = registerDeviceAndIpInDb(client, deviceId, ip)
         if (regResult != null && !regResult.username.isNullOrBlank() && !regResult.password.isNullOrBlank()) {
             return@withContext regResult
@@ -260,6 +297,7 @@ object DeviceAuthManager {
             "$CONFIGURAR_URL?device_id=$deviceId&id=$deviceId&tipo_dispositivo=tv&ip=$ip&json=1&t=${System.currentTimeMillis()}"
         )
 
+        var networkSuccess = false
         for (url in urlsToTry) {
             try {
                 val request = Request.Builder()
@@ -271,6 +309,7 @@ object DeviceAuthManager {
 
                 client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
+                        networkSuccess = true
                         val bodyStr = response.body.string()
                         val res = parseCredentialsFromResponse(bodyStr, deviceId, ip)
                         if (res != null && !res.username.isNullOrBlank() && !res.password.isNullOrBlank()) {
@@ -279,6 +318,10 @@ object DeviceAuthManager {
                     }
                 }
             } catch (_: Exception) {}
+        }
+        
+        if (!networkSuccess) {
+            throw java.io.IOException("Fallo al conectar con el servidor de auth")
         }
 
         DeviceAuthResult(isBlocked = false, deviceId = deviceId, deviceIp = ip)

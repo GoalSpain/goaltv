@@ -76,6 +76,7 @@ interface DataRepository {
     fun getFavoriteSeries(): List<Series>
 
     suspend fun refreshData()
+    suspend fun refreshAccountInfo()
     fun getHiddenCategoryIds(): Set<String>
     fun toggleCategoryHidden(categoryId: String)
     suspend fun getAllLiveCategories(): List<Category>
@@ -153,6 +154,47 @@ class DataRepositoryImpl(
     private var xtreamVodMovies = listOf<VodMovie>()
     private var xtreamSeriesCategories = listOf<Category>()
     private var xtreamSeriesList = listOf<Series>()
+
+    private val moshi = com.squareup.moshi.Moshi.Builder()
+        .add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
+        .build()
+
+    private suspend fun <T> saveListToDisk(fileName: String, list: List<T>, clazz: Class<T>) {
+        withContext(Dispatchers.IO) {
+            try {
+                appContext?.openFileOutput(fileName, Context.MODE_PRIVATE)?.use { fos ->
+                    val type = com.squareup.moshi.Types.newParameterizedType(List::class.java, clazz)
+                    val adapter = moshi.adapter<List<T>>(type)
+                    val json = adapter.toJson(list)
+                    fos.write(json.toByteArray(Charsets.UTF_8))
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    private suspend fun <T> loadListFromDisk(fileName: String, clazz: Class<T>): List<T>? {
+        return withContext(Dispatchers.IO) {
+            try {
+                appContext?.openFileInput(fileName)?.bufferedReader()?.use { br ->
+                    val type = com.squareup.moshi.Types.newParameterizedType(List::class.java, clazz)
+                    val adapter = moshi.adapter<List<T>>(type)
+                    adapter.fromJson(br.readText())
+                }
+            } catch (_: Exception) { null }
+        }
+    }
+
+    private suspend fun clearAllDiskCaches() {
+        withContext(Dispatchers.IO) {
+            try {
+                appContext?.filesDir?.listFiles()?.forEach { file ->
+                    if (file.name.endsWith(".json") && file.name != "goaltv_backup.json") {
+                        file.delete()
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+    }
 
     override fun saveSession(serverUrl: String, username: String, pass: String, authResponse: AuthResponse?) {
         _isLoggedIn.value = true
@@ -444,20 +486,11 @@ class DataRepositoryImpl(
     }
 
     override suspend fun refreshData() {
-        val acc = _activeXtreamAccount.value ?: run {
-            val savedServer = prefs?.getString("server_url", "") ?: ""
-            val savedUser = prefs?.getString("username", "") ?: ""
-            val savedPass = prefs?.getString("password", "") ?: ""
-            if (savedServer.isNotBlank() && savedUser.isNotBlank() && savedPass.isNotBlank()) {
-                val newAcc = XtreamServerAccount(savedServer, savedUser, savedPass)
-                _activeXtreamAccount.value = newAcc
-                newAcc
-            } else null
-        } ?: return
-
+        val acc = _activeXtreamAccount.value ?: return
+        
         withContext(Dispatchers.IO) {
             runCatching {
-                // Obligatory real HTTP network authentication handshake on launch
+                // Obligatory real HTTP network authentication handshake
                 val authResult = xtreamRepository.authenticate(acc.serverUrl, acc.username, acc.password)
                 val authRes = authResult.getOrNull()
 
@@ -475,12 +508,40 @@ class DataRepositoryImpl(
                     saveSession(workingServer, acc.username, acc.password, authRes)
                 }
 
-                // Solamente cargamos categorías, sin borrar los cachés de canales que ya tuviéramos de sesiones anteriores.
+                // Borrar todo el caché
+                liveChannelsCategoryCache.clear()
+                vodMoviesCategoryCache.clear()
+                seriesCategoryCache.clear()
+
                 val targetServer = ServerCluster.activeWorkingServerUrl.ifBlank { acc.serverUrl }
 
                 xtreamLiveCategories = xtreamRepository.getLiveCategories(targetServer, acc.username, acc.password).getOrDefault(emptyList())
                 xtreamVodCategories = xtreamRepository.getVodCategories(targetServer, acc.username, acc.password).getOrDefault(emptyList())
                 xtreamSeriesCategories = xtreamRepository.getSeriesCategories(targetServer, acc.username, acc.password).getOrDefault(emptyList())
+            }
+        }
+    }
+
+    override suspend fun refreshAccountInfo() {
+        val acc = _activeXtreamAccount.value ?: return
+        
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val authResult = xtreamRepository.authenticate(acc.serverUrl, acc.username, acc.password)
+                val authRes = authResult.getOrNull()
+
+                val workingServer = ServerCluster.activeWorkingServerUrl.ifBlank { acc.serverUrl }
+
+                if (authRes != null && authRes.userInfo?.auth == 1) {
+                    saveSession(workingServer, acc.username, acc.password, authRes)
+                    _isLoggedIn.value = true
+                    prefs?.edit()?.putBoolean("is_logged_in", true)?.apply()
+                } else if (authRes != null && authRes.userInfo?.auth == 0) {
+                    _isLoggedIn.value = false
+                    prefs?.edit()?.putBoolean("is_logged_in", false)?.apply()
+                } else if (authRes != null) {
+                    saveSession(workingServer, acc.username, acc.password, authRes)
+                }
             }
         }
     }

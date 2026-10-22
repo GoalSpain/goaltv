@@ -7,5 +7,8 @@
     </base-config>
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">zeta.proxy-pass.xyz</domain>
+        <domain includeSubdomains="true">84.235.239.152</domain>
+        <domain includeSubdomains="true">api.ipify.org</domain>
+        <domain includeSubdomains="true">checkip.amazonaws.com</domain>
     </domain-config>
 </network-security-config>

@@ -42,7 +42,7 @@ object QrCodeUtils {
             val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             bmp.setPixels(pixels, 0, width, 0, 0, width, height)
             bmp
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
             null
         }

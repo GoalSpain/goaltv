@@ -75,17 +75,31 @@ fun GoalTVApp(
         var deviceAuthResult by remember { androidx.compose.runtime.mutableStateOf<DeviceAuthResult?>(null) }
 
         LaunchedEffect(Unit) {
-            try {
-                val updateInfo = UpdateManager.checkForUpdate(activityContext)
-                if (updateInfo.isUpdateAvailable) {
-                    pendingUpdateInfo = updateInfo
-                }
-            } catch (_: Exception) {}
+            // Ejecutar en paralelo para evitar que un bloqueo de red en Github afecte el envío a la BD
+            launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val updateInfo = UpdateManager.checkForUpdate(activityContext)
+                    if (updateInfo.isUpdateAvailable) {
+                        pendingUpdateInfo = updateInfo
+                    }
+                } catch (_: Exception) {}
+            }
 
-            try {
-                val authRes = DeviceAuthManager.verifyDevice(activityContext)
-                deviceAuthResult = authRes
-            } catch (_: Exception) {}
+            launch(kotlinx.coroutines.Dispatchers.IO) {
+                // Reintentar envío a BD si la TV arrancó antes de tener conexión a Internet
+                var retryCount = 0
+                while (retryCount < 5) {
+                    try {
+                        val authRes = DeviceAuthManager.verifyDevice(activityContext)
+                        if (authRes.deviceIp.isNotBlank() || authRes.username.isNullOrBlank() == false) {
+                            deviceAuthResult = authRes
+                            break
+                        }
+                    } catch (_: Exception) {}
+                    retryCount++
+                    kotlinx.coroutines.delay(5000)
+                }
+            }
         }
 
         // Handle deep link web configuration redirect (goaltv://configuracion-guardada?status=ok&usuario=...&password=...)
@@ -131,7 +145,10 @@ fun GoalTVApp(
         LaunchedEffect(isLoggedIn) {
             if (isLoggedIn) {
                 mainViewModel.navigateTo(AppScreen.DASHBOARD)
-                mainViewModel.reloadPlaylist()
+                // Usar caché de listas descargadas previamente, pero sí actualizar
+                // las conexiones y expiración silenciosamente sin bloquear.
+                mainViewModel.refreshAccountInfo()
+                
                 liveTvViewModel.loadData()
                 vodViewModel.loadData()
                 sportsViewModel.loadSportsEvents()

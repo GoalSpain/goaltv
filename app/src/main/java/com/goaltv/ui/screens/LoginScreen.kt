@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.QrCode
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -329,16 +330,41 @@ fun LoginScreen(
 
     if (showQrDialog) {
         val deviceId = remember { DeviceAuthManager.getDeviceId(context) }
-        var qrUrl by remember { mutableStateOf("http://84.235.239.152/admin/configurar.php?id=$deviceId") }
+        var qrUrl by remember { mutableStateOf("http://84.235.239.152/goaltv/configurar.php?id=$deviceId") }
+        var isWaitingConnection by remember { mutableStateOf(true) }
+        var isUnsupportedOs by remember { mutableStateOf(false) }
+        val osVersion = android.os.Build.VERSION.RELEASE
 
         LaunchedEffect(Unit) {
-            val generatedUrl = DeviceAuthManager.getQrUrl(context)
-            qrUrl = generatedUrl
+            var retries = 0
+            while (isActive) {
+                try {
+                    val generatedUrl = DeviceAuthManager.getQrUrl(context)
+                    if (generatedUrl.isNotBlank()) {
+                        qrUrl = generatedUrl
+                        isWaitingConnection = false
+                        break
+                    }
+                } catch (_: Exception) {
+                    isWaitingConnection = true
+                }
+                
+                retries++
+                if (retries >= 3) {
+                    isUnsupportedOs = true
+                    isWaitingConnection = false
+                    break
+                }
+                kotlinx.coroutines.delay(3000L)
+            }
         }
 
         QrCodeLoginDialog(
             qrUrl = qrUrl,
             deviceId = deviceId,
+            isWaitingForConnection = isWaitingConnection,
+            isUnsupportedOs = isUnsupportedOs,
+            osVersion = osVersion,
             onDismiss = { showQrDialog = false },
             onDataReceived = { authRes ->
                 showQrDialog = false
@@ -355,20 +381,27 @@ fun LoginScreen(
 fun QrCodeLoginDialog(
     qrUrl: String,
     deviceId: String,
+    isWaitingForConnection: Boolean = false,
+    isUnsupportedOs: Boolean = false,
+    osVersion: String = "",
     onDismiss: () -> Unit,
     onDataReceived: (DeviceAuthResult) -> Unit
 ) {
     val context = LocalContext.current
 
-    // Escuchar activamente los datos recibidos desde http://84.235.239.152/admin/configurar.php
+    // Escuchar activamente los datos recibidos desde http://84.235.239.152/goaltv/configurar.php
     LaunchedEffect(Unit) {
         while (isActive) {
-            val authRes = withContext(Dispatchers.IO) {
-                DeviceAuthManager.verifyDevice(context)
-            }
-            if (!authRes.username.isNullOrBlank() && !authRes.password.isNullOrBlank()) {
-                onDataReceived(authRes)
-                break
+            try {
+                val authRes = withContext(Dispatchers.IO) {
+                    DeviceAuthManager.verifyDevice(context)
+                }
+                if (!authRes.username.isNullOrBlank() && !authRes.password.isNullOrBlank()) {
+                    onDataReceived(authRes)
+                    break
+                }
+            } catch (_: Exception) {
+                // Ignore network errors and keep polling
             }
             delay(1500L)
         }
@@ -402,52 +435,89 @@ fun QrCodeLoginDialog(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "Escanea este código QR con la cámara de tu móvil para configurar la cuenta desde la web:",
-                    color = TextMuted,
-                    fontSize = 13.sp
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                QrCodeView(
-                    content = qrUrl,
-                    modifier = Modifier.size(200.dp)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Surface(
-                    color = Color(0xFF222232),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                ) {
+                if (isUnsupportedOs) {
+                    Icon(
+                        imageVector = Icons.Rounded.Warning,
+                        contentDescription = "Error",
+                        tint = StatusError,
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "ID Dispositivo: $deviceId",
-                        color = OrangePrimary,
-                        fontSize = 13.sp,
+                        text = "El S.O. Android $osVersion del dispositivo no admite esta función",
+                        color = Color.White,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = OrangePrimary,
-                        strokeWidth = 2.dp
-                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Esperando recibir los datos, esta ventana se cerrará automáticamente",
-                        color = OrangePrimary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
+                        text = "Por favor, inicia sesión introduciendo tu usuario y contraseña manualmente en la pantalla anterior.",
+                        color = TextMuted,
+                        fontSize = 12.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
+                } else if (isWaitingForConnection) {
+                    Text(
+                        text = "Conectando...",
+                        color = OrangePrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(36.dp),
+                        color = OrangePrimary,
+                        strokeWidth = 3.dp
+                    )
+                } else {
+                    Text(
+                        text = "Escanea este código QR con la cámara de tu móvil para configurar la cuenta desde la web:",
+                        color = TextMuted,
+                        fontSize = 13.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    QrCodeView(
+                        content = qrUrl,
+                        modifier = Modifier.size(200.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Surface(
+                        color = Color(0xFF222232),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    ) {
+                        Text(
+                            text = "ID Dispositivo: $deviceId",
+                            color = OrangePrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = OrangePrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Text(
+                            text = "Esperando que inicies sesión en tu móvil...",
+                            color = TextMuted,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
         },

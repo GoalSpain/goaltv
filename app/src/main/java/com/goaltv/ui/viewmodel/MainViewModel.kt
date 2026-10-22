@@ -252,6 +252,14 @@ class MainViewModel(
         }
     }
 
+    fun refreshAccountInfo() {
+        viewModelScope.launch {
+            try {
+                repository.refreshAccountInfo()
+            } catch (_: Exception) {}
+        }
+    }
+
     fun exportBackupToUri(context: Context, uri: Uri): Boolean {
         return try {
             val jsonStr = repository.exportBackupToJson()

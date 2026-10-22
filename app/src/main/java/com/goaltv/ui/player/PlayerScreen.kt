@@ -139,8 +139,18 @@ fun PlayerScreen(
 
         val mediaSourceFactory = DefaultMediaSourceFactory(okHttpDataSourceFactory)
 
+        // Set safe timeout configuration to prevent decoder lockups on low-RAM Smart TVs (e.g. TCL)
+        val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                androidx.media3.exoplayer.DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
+                androidx.media3.exoplayer.DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
+                androidx.media3.exoplayer.DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
+                androidx.media3.exoplayer.DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
+            ).build()
+
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(mediaSourceFactory)
+            .setLoadControl(loadControl)
             .setSeekBackIncrementMs(10000)
             .setSeekForwardIncrementMs(10000)
             .build().apply {
@@ -328,7 +338,11 @@ fun PlayerScreen(
                 activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 lifecycleOwner.lifecycle.removeObserver(observer)
                 exoPlayer.removeListener(listener)
+                
+                // Ensure safe thread shutdown on TCL and Mediatek devices
+                exoPlayer.playWhenReady = false
                 exoPlayer.stop()
+                exoPlayer.clearMediaItems()
                 exoPlayer.release()
             } catch (_: Exception) {}
         }
